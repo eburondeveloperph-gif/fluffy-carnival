@@ -630,23 +630,14 @@ function RoomInner(props: {
     isSourceSpeaker: roomState?.activeSpeaker?.userId === user?.id,
   });
 
+  const isCurrentUserSpeaker = roomState?.activeSpeaker?.userId === user?.id;
+
+  // SPEAKER: Send transcription for translation when speaking
   React.useEffect(() => {
-    if (
-      isListening &&
-      roomState?.activeSpeaker?.userId === user?.id &&
-      orbitMicState.isFinal &&
-      orbitMicState.transcript?.trim()
-    ) {
+    if (isCurrentUserSpeaker && orbitMicState.isFinal && orbitMicState.transcript?.trim()) {
       translator.sendTranslation(orbitMicState.transcript);
     }
-  }, [
-    isListening,
-    roomState?.activeSpeaker?.userId,
-    user?.id,
-    orbitMicState.isFinal,
-    orbitMicState.transcript,
-    translator,
-  ]);
+  }, [isCurrentUserSpeaker, orbitMicState.isFinal, orbitMicState.transcript, translator]);
 
   const audioCaptureOptions = React.useMemo<AudioCaptureOptions>(() => {
     const activeDeviceId =
