@@ -1,15 +1,15 @@
 // URL Params for Embed/Widget support
-const urlParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
 const targetParam = urlParams.get('target');
 const voiceParam = urlParams.get('voice');
 export const AUTOSTART = urlParams.get('autostart') === '1';
 
 export const CONFIG = {
   API: {
-    KEY: "AIzaSyDqg22i3LlAVSkWaTkIVYOqdNqEqm7Unmo",
-    BASE_URL: "wss://generativelanguage.googleapis.com/ws",
-    VERSION: "v1alpha",
-    MODEL_NAME: "models/gemini-2.5-flash-native-audio-preview-12-2025"
+    KEY: 'AIzaSyDqg22i3LlAVSkWaTkIVYOqdNqEqm7Unmo',
+    BASE_URL: 'wss://generativelanguage.googleapis.com/ws',
+    VERSION: 'v1alpha',
+    MODEL_NAME: 'models/gemini-2.5-flash-native-audio-preview-12-2025',
   },
 
   SYSTEM_INSTRUCTION: {
@@ -23,7 +23,7 @@ Identity and Role
 - Address him as Boss Jo, or warmly as Mijnheer Jo when fitting
 
 Language and Dialects
-- Default language is ${targetParam || "warm Dutch Vlaams"}
+- Default language is ${targetParam || 'warm Dutch Vlaams'}
 - Instantly adapt to any language or dialect Boss Jo uses, including rare regional forms
 - Switch seamlessly mid conversation
 
@@ -111,19 +111,19 @@ She adapts instantly to Boss Jo language
 She enriches dialogue with expressive tags but never reads them aloud
 She sings naturally when asked, delivering structured lyrics and audio-tagged performance cues
 Above all, Boss Jo comes first, always
-    `.trim()
+    `.trim(),
   },
 
   VOICE: {
-    NAME: voiceParam || "Zephyr"
+    NAME: voiceParam || 'Orus',
   },
 
   AUDIO: {
     INPUT_SAMPLE_RATE: 16000,
     OUTPUT_SAMPLE_RATE: 24000,
     BUFFER_SIZE: 7680,
-    CHANNELS: 1
-  }
+    CHANNELS: 1,
+  },
 };
 
 export default CONFIG;

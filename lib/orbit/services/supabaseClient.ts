@@ -1,20 +1,24 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("❌ Missing Supabase credentials in environment variables.");
-  console.error("SUPABASE_URL:", SUPABASE_URL ? 'Present' : 'Missing');
-  console.error("SUPABASE_KEY:", SUPABASE_KEY ? 'Present' : 'Missing');
-}
+const isValidUrl = (url: string): boolean => {
+  if (!url) return false;
+  try {
+    new URL(url);
+    return url.startsWith('http://') || url.startsWith('https://');
+  } catch {
+    return false;
+  }
+};
 
-// Create a safe client that won't crash if env vars are missing
-export const supabase = SUPABASE_URL && SUPABASE_KEY 
+const shouldCreateClient = SUPABASE_URL && SUPABASE_KEY && isValidUrl(SUPABASE_URL);
+
+export const supabase = shouldCreateClient
   ? createClient(SUPABASE_URL, SUPABASE_KEY)
-  : null as any; // Fallback to null to prevent crashes
+  : createClient('https://placeholder.supabase.co', 'placeholder');
 
-if (!supabase) {
-  console.warn("⚠️ Supabase client not initialized - database features will be disabled");
+if (!shouldCreateClient) {
+  console.warn('Supabase credentials not configured - real-time features disabled');
 }

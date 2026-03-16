@@ -15,6 +15,10 @@ export default function Page() {
 
   useEffect(() => {
     async function boot() {
+      if (!supabase) {
+        setAuthStatus('OFFLINE');
+        return;
+      }
       try {
         const { data, error } = await supabase.auth.signInAnonymously();
         if (error) throw error;

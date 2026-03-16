@@ -1,0 +1,250 @@
+/**
+ * WebSocket Translation Server (Optional Enhancement)
+ *
+ * This is an alternative architecture that uses a direct WebSocket connection
+ * for even lower latency translation. It combines STT, translation, and TTS
+ * into a single WebSocket stream.
+ *
+ * To use this:
+ * 1. Create a WebSocket server route (e.g., /api/ws/translate)
+ * 2. Connect from the client using native WebSocket API
+ * 3. Stream audio → Receive translated audio in real-time
+ */
+
+import { WebSocket } from 'ws';
+
+interface TranslationStreamOptions {
+  targetLanguage: string;
+  onTranslation: (text: string) => void;
+  onAudio: (audioBuffer: ArrayBuffer) => void;
+  onError: (error: Error) => void;
+}
+
+/**
+ * Client-side WebSocket Translation Stream
+ *
+ * Usage:
+ * ```typescript
+ * const stream = new TranslationWebSocketStream({
+ *   targetLanguage: 'Spanish',
+ *   onTranslation: (text) => console.log('Translated:', text),
+ *   onAudio: (buffer) => playAudio(buffer),
+ *   onError: (err) => console.error(err)
+ * });
+ *
+ * await stream.connect();
+ * stream.sendText('Hello world');
+ * ```
+ */
+export class TranslationWebSocketStream {
+  private ws: WebSocket | null = null;
+  private options: TranslationStreamOptions;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 3;
+
+  constructor(options: TranslationStreamOptions) {
+    this.options = options;
+  }
+
+  async connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        // Connect to WebSocket endpoint
+        const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/ws/translate`;
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+          console.log('[TranslationStream] Connected');
+          this.reconnectAttempts = 0;
+
+          // Send initial configuration
+          this.ws?.send(
+            JSON.stringify({
+              type: 'config',
+              targetLanguage: this.options.targetLanguage,
+            }),
+          );
+
+          resolve();
+        };
+
+        this.ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+
+            switch (message.type) {
+              case 'translation':
+                this.options.onTranslation(message.text);
+                break;
+              case 'audio':
+                // Convert base64 to ArrayBuffer
+                const binaryString = atob(message.audio);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i);
+                }
+                this.options.onAudio(bytes.buffer);
+                break;
+              case 'error':
+                this.options.onError(new Error(message.error));
+                break;
+            }
+          } catch (e) {
+            console.error('[TranslationStream] Message parse error:', e);
+          }
+        };
+
+        this.ws.onerror = (error) => {
+          console.error('[TranslationStream] WebSocket error:', error);
+          this.options.onError(new Error('WebSocket connection error'));
+          reject(error);
+        };
+
+        this.ws.onclose = () => {
+          console.log('[TranslationStream] Disconnected');
+          this.attemptReconnect();
+        };
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  sendText(text: string): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: 'text',
+          text,
+        }),
+      );
+    }
+  }
+
+  sendAudio(audioBlob: Blob): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      // Convert blob to base64 and send
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        this.ws?.send(
+          JSON.stringify({
+            type: 'audio',
+            audio: base64,
+          }),
+        );
+      };
+      reader.readAsDataURL(audioBlob);
+    }
+  }
+
+  disconnect(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+
+  private attemptReconnect(): void {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(
+        `[TranslationStream] Reconnecting... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
+      );
+      setTimeout(() => this.connect(), 1000 * this.reconnectAttempts);
+    }
+  }
+}
+
+/**
+ * Server-side WebSocket Handler (Next.js Route Handler)
+ *
+ * Create: app/api/ws/translate/route.ts
+ *
+ * Note: Next.js doesn't natively support WebSocket in API routes.
+ * You may need to use a custom server or a service like Pusher, Ably, or Socket.io
+ *
+ * Alternative: Use Server-Sent Events (SSE) which is supported:
+ */
+
+/**
+ * Server-Sent Events (SSE) Alternative
+ * Better supported in Next.js App Router
+ *
+ * Client Usage:
+ * ```typescript
+ * const eventSource = new EventSource('/api/sse/translate?lang=Spanish');
+ * eventSource.onmessage = (event) => {
+ *   const data = JSON.parse(event.data);
+ *   if (data.type === 'translation') setTranslation(data.text);
+ *   if (data.type === 'audio') playAudio(data.audio);
+ * };
+ * ```
+ */
+
+// Example SSE Route Handler (app/api/sse/translate/route.ts)
+/*
+import { NextRequest } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  const targetLang = request.nextUrl.searchParams.get('lang') || 'English';
+  
+  const stream = new ReadableStream({
+    start(controller) {
+      // Send translation updates
+      const sendTranslation = (text: string) => {
+        controller.enqueue(`data: ${JSON.stringify({ type: 'translation', text })}\n\n`);
+      };
+      
+      // Subscribe to transcription events
+      const unsubscribe = subscribeToTranscriptions((transcription) => {
+        // Translate and send
+        translateText(transcription.text, targetLang).then(translation => {
+          sendTranslation(translation);
+          
+          // Generate TTS and send audio
+          generateTTS(translation).then(audio => {
+            const base64 = Buffer.from(audio).toString('base64');
+            controller.enqueue(`data: ${JSON.stringify({ type: 'audio', audio: base64 })}\n\n`);
+          });
+        });
+      });
+      
+      // Cleanup on close
+      request.signal.addEventListener('abort', () => {
+        unsubscribe();
+        controller.close();
+      });
+    }
+  });
+  
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    }
+  });
+}
+*/
+
+/**
+ * Recommended Architecture Summary
+ *
+ * Current Implementation (Supabase Realtime):
+ * - Pros: Simple, uses existing infrastructure, automatic reconnection
+ * - Cons: Slightly higher latency due to DB round-trip
+ *
+ * SSE Alternative:
+ * - Pros: Lower latency than polling, supported by Next.js
+ * - Cons: One-way communication (server to client only)
+ *
+ * WebSocket (Custom Server):
+ * - Pros: Lowest latency, bidirectional
+ * - Cons: Requires custom server setup, more complex
+ *
+ * Recommendation: Stick with Supabase Realtime for now (current implementation)
+ * It's fast enough for most use cases and much simpler to maintain.
+ */
+
+export default TranslationWebSocketStream;

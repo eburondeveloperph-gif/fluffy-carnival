@@ -1,110 +1,163 @@
-
 import { NextResponse } from 'next/server';
+import {
+  sanitizeErrorMessage,
+  logInfo,
+  logError,
+  getModelId,
+  SERVICE_ALIASES,
+  STATUS_MESSAGES,
+} from '@/lib/orbit/config/serviceAliases';
 
+/**
+ * Eburon AI Translation API
+ *
+ * Translates text using Eburon AI (whitelisted LLM providers).
+ * Never exposes internal model names in errors or responses.
+ */
 export async function POST(request: Request) {
   try {
     const { text, targetLang } = await request.json();
 
     if (!text || !targetLang) {
-      return new NextResponse('Missing text or targetLang', { status: 400 });
+      return NextResponse.json(
+        {
+          error: 'Missing required parameters',
+          message: 'Please provide text and target language.',
+        },
+        { status: 400 },
+      );
     }
 
-    // 0. Try Remote Ollama (User Preference)
+    logInfo('ECHO', `Processing translation request to ${targetLang}`);
+
+    // Try Ollama first (ifconfigured)
     const ollamaUrl = process.env.OLLAMA_BASE_URL;
     if (ollamaUrl) {
       try {
-        console.log(`[Orbit] Attempting Remote Ollama at ${ollamaUrl}...`);
+        logInfo('ECHO', 'Using local Eburon AI instance...');
+
         const olResponse = await fetch(`${ollamaUrl}/api/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: "gemini-3-flash-preview:cloud", // Upgraded to user's new model
+            model: getModelId('TRANSLATION_LLM'),
             prompt: `Translate the following text to ${targetLang}. Output ONLY the translated text.\n\nText: ${text}`,
-            stream: false
-          })
+            stream: false,
+          }),
         });
 
         if (olResponse.ok) {
-           const data = await olResponse.json();
-           const translation = data.response?.trim();
-           if (translation) return NextResponse.json({ translation });
-        } else {
-           console.warn(`[Orbit] Remote Ollama failed (${olResponse.status}). Fallback...`);
+          const data = await olResponse.json();
+          const translation = data.response?.trim();
+          if (translation) {
+            logInfo('ECHO', STATUS_MESSAGES.COMPLETE);
+            return NextResponse.json({ translation });
+          }
         }
       } catch (e) {
-         console.error("[Orbit] Remote Ollama connection error:", e);
+        logError('ECHO', 'Local instance unavailable, using cloud...');
       }
     }
 
-    // 1. Try DeepSeek (User Preference)
+    // Try DeepSeek (whitelisted)
     const deepseekKey = process.env.DEEPSEEK_API_KEY;
     if (deepseekKey) {
       try {
+        logInfo('ECHO', 'Using Eburon AI cloud...');
+
         const dsResponse = await fetch('https://api.deepseek.com/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${deepseekKey}`
+            Authorization: `Bearer ${deepseekKey}`,
           },
           body: JSON.stringify({
-            model: "deepseek-chat",
+            model: 'deepseek-chat', // Whitelisted model
             messages: [
-              { role: "system", content: "You are a professional translator. Output ONLY the translated text." },
-              { role: "user", content: `Translate to ${targetLang}:\n\n${text}` }
+              {
+                role: 'system',
+                content:
+                  'You are Eburon AI, a professional translator. Output ONLY the translated text.',
+              },
+              { role: 'user', content: `Translate to ${targetLang}:\n\n${text}` },
             ],
-            stream: false
-          })
+            stream: false,
+          }),
         });
 
         if (dsResponse.ok) {
           const data = await dsResponse.json();
           const translation = data.choices?.[0]?.message?.content?.trim();
-          if (translation) return NextResponse.json({ translation });
-        } else {
-          const err = await dsResponse.text();
-          console.warn(`[Orbit] DeepSeek translation failed (${dsResponse.status}): ${err}. Falling back to Gemini.`);
+          if (translation) {
+            logInfo('ECHO', STATUS_MESSAGES.COMPLETE);
+            return NextResponse.json({ translation });
+          }
         }
       } catch (e) {
-        console.error("[Orbit] DeepSeek connection error:", e);
+        logError('ECHO', 'Cloud provider issue, trying fallback...');
       }
     }
 
-    // 2. Fallback to Gemini (Verified Working)
+    // Fallback to Gemini (whitelisted)
     const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!geminiKey) {
-      return new NextResponse('Translation Failed: DeepSeek failed and no Gemini key found', { status: 500 });
+      logError('ECHO', 'No service available');
+      return NextResponse.json(
+        {
+          error: STATUS_MESSAGES.ERROR,
+          message: 'Eburon AI is temporarily unavailable. Please try again later.',
+        },
+        { status: 503 },
+      );
     }
 
-    // Use reported working model
-    const model = 'gemini-1.5-flash';
+    logInfo('ECHO', 'Using Eburon AI primary...');
+
+    const model = getModelId('TRANSLATION_LLM');
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
 
     const geminiResponse = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [{ 
-            text: `Translate the following text to ${targetLang}. Output ONLY the translated text.\n\nText: ${text}` 
-          }]
-        }],
-        generationConfig: { temperature: 0.1 }
+        contents: [
+          {
+            parts: [
+              {
+                text: `Translate the following text to ${targetLang}. Output ONLY the translated text.\n\nText: ${text}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.1 },
       }),
     });
 
     if (!geminiResponse.ok) {
       const err = await geminiResponse.text();
-      console.error(`[Orbit] Gemini translation failed (${geminiResponse.status}):`, err);
-      return new NextResponse(err, { status: geminiResponse.status });
+      logError('ECHO', `Service error: ${geminiResponse.status}`);
+      return NextResponse.json(
+        {
+          error: STATUS_MESSAGES.ERROR,
+          message: 'Eburon AI encountered an issue. Please try again.',
+        },
+        { status: geminiResponse.status >= 500 ? 503 : 400 },
+      );
     }
 
     const data = await geminiResponse.json();
-    const translation = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    const translation = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
+    logInfo('ECHO', STATUS_MESSAGES.COMPLETE);
     return NextResponse.json({ translation });
-
   } catch (error) {
-    console.error('Orbit translation route error:', error);
-    return new NextResponse('Internal error', { status: 500 });
+    logError('ECHO', error);
+    return NextResponse.json(
+      {
+        error: STATUS_MESSAGES.ERROR,
+        message: sanitizeErrorMessage(error),
+      },
+      { status: 500 },
+    );
   }
 }

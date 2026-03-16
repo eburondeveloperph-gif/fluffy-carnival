@@ -1,59 +1,106 @@
-
 import { NextResponse } from 'next/server';
+import {
+  sanitizeErrorMessage,
+  logInfo,
+  logError,
+  STATUS_MESSAGES,
+} from '@/lib/orbit/config/serviceAliases';
 
+/**
+ * Echo STT API
+ *
+ * Transcribes audio using Echo STT Engine.
+ * Never exposes internal provider names in errors or responses.
+ */
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const audioBlob = formData.get('audio') as Blob;
-    const language = formData.get('language') as string || 'en';
+    const language = (formData.get('language') as string) || 'en';
 
     if (!audioBlob) {
-      return new NextResponse('Missing audio data', { status: 400 });
+      return NextResponse.json(
+        {
+          error: 'Missing audio data',
+          message: 'Please provide audio data to transcribe.',
+        },
+        { status: 400 },
+      );
     }
 
-    const apiKey = process.env.DEEPGRAM_API_KEY;
+    logInfo('ECHO', `Processing audio (${audioBlob.size} bytes, language: ${language})`);
+
+    const apiKey = process.env.DEEPGRAM_API_KEY || process.env.ORBIT_API_KEY;
     if (!apiKey) {
-      return new NextResponse('Orbit API key not configured', { status: 503 });
+      logError('ECHO', 'No API key configured');
+      return NextResponse.json(
+        {
+          error: STATUS_MESSAGES.ERROR,
+          message: 'Echo is not configured. Please contact support.',
+        },
+        { status: 503 },
+      );
     }
 
-    // Convert blob to buffer
+    // Convert blob to array buffer
     const arrayBuffer = await audioBlob.arrayBuffer();
 
-    let dgUrl = 'https://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&smart_format=true';
+    // Build API URL with parameters (whitelisted provider)
+    let sttUrl = 'https://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&smart_format=true';
     if (language === 'auto') {
-      dgUrl += '&detect_language=true';
+      sttUrl += '&detect_language=true';
     } else {
-      dgUrl += `&language=${language}`;
+      sttUrl += `&language=${language}`;
     }
 
-    // Call Orbit Engine API
-    const response = await fetch(
-      dgUrl,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Token ${apiKey}`,
-          'Content-Type': audioBlob.type || 'audio/webm',
-        },
-        body: arrayBuffer,
-      }
-    );
+    logInfo('ECHO', STATUS_MESSAGES.PROCESSING);
+
+    // Call STT API
+    const response = await fetch(sttUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        'Content-Type': audioBlob.type || 'audio/webm',
+      },
+      body: arrayBuffer,
+    });
 
     if (!response.ok) {
       const err = await response.text();
-      console.error('Orbit STT Error:', err);
-      return new NextResponse(err, { status: response.status });
+      logError('ECHO', `Transcription failed: ${response.status}`);
+
+      return NextResponse.json(
+        {
+          error: STATUS_MESSAGES.ERROR,
+          message: 'Echo encountered an issue. Please try again.',
+        },
+        { status: response.status >= 500 ? 503 : 400 },
+      );
     }
 
     const data = await response.json();
     const transcript = data.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+    const confidence = data.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
 
-    return NextResponse.json({ 
+    logInfo(
+      'ECHO',
+      `Transcription complete (${transcript.length} chars, confidence: ${(confidence * 100).toFixed(0)}%)`,
+    );
+
+    return NextResponse.json({
       transcript: transcript.trim(),
-      confidence: data.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0
+      confidence,
+      engine: 'Echo',
+      version: '2.5',
     });
   } catch (error) {
-    console.error('Orbit STT route error:', error);
-    return new NextResponse('Internal error', { status: 500 });
+    logError('ECHO', error);
+    return NextResponse.json(
+      {
+        error: STATUS_MESSAGES.ERROR,
+        message: sanitizeErrorMessage(error),
+      },
+      { status: 500 },
+    );
   }
 }
