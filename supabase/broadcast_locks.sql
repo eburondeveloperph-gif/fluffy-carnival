@@ -1,3 +1,4 @@
+
 -- Supabase schema for broadcast locks
 -- This table ensures only one user can broadcast in a room at a time
 
