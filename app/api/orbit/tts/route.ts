@@ -28,58 +28,56 @@ export async function POST(request: Request) {
 
     logInfo('ECHO', `Synthesizing ${text.length} characters`);
 
-    // Try Kokoro TTS - per sentence
-    const kokoroUrl = process.env.KOKORO_URL;
-    if (kokoroUrl) {
-      try {
-        logInfo('ECHO', 'Using Kokoro TTS...');
+    // Try Kokoro TTS (local) - per sentence
+    const kokoroUrl = process.env.KOKORO_URL || 'http://localhost:5000';
+    try {
+      logInfo('ECHO', 'Using Kokoro TTS...');
 
-        // Split text into sentences
-        const sentences = text.split(/(?<=[.!?])\s+/).filter((s: string) => s.trim().length > 0);
-        logInfo('ECHO', `Processing ${sentences.length} sentences`);
+      // Split text into sentences
+      const sentences = text.split(/(?<=[.!?])\s+/).filter((s: string) => s.trim().length > 0);
+      logInfo('ECHO', `Processing ${sentences.length} sentences`);
 
-        const audioBuffers: ArrayBuffer[] = [];
+      const audioBuffers: ArrayBuffer[] = [];
 
-        for (const sentence of sentences) {
-          const cleanSentence = sentence.trim();
-          if (!cleanSentence) continue;
+      for (const sentence of sentences) {
+        const cleanSentence = sentence.trim();
+        if (!cleanSentence) continue;
 
-          logInfo('ECHO', `Synthesizing: ${cleanSentence}`);
+        logInfo('ECHO', `Synthesizing: ${cleanSentence}`);
 
-          const kokoroResponse = await fetch(`${kokoroUrl}/tts`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              text: cleanSentence,
-              voice: process.env.KOKORO_VOICE || 'af_sarah',
-            }),
-          });
+        const kokoroResponse = await fetch(`${kokoroUrl}/tts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: cleanSentence,
+            voice: process.env.KOKORO_VOICE || 'af_sarah',
+          }),
+        });
 
-          if (kokoroResponse.ok) {
-            const buffer = await kokoroResponse.arrayBuffer();
-            audioBuffers.push(buffer);
-          } else {
-            logError('ECHO', `Failed: ${kokoroResponse.status}`);
-          }
+        if (kokoroResponse.ok) {
+          const buffer = await kokoroResponse.arrayBuffer();
+          audioBuffers.push(buffer);
+        } else {
+          logError('ECHO', `Failed: ${kokoroResponse.status}`);
         }
-
-        if (audioBuffers.length > 0) {
-          const totalLength = audioBuffers.reduce((acc, buf) => acc + buf.byteLength, 0);
-          const combinedBuffer = new Uint8Array(totalLength);
-          let offset = 0;
-          for (const buf of audioBuffers) {
-            combinedBuffer.set(new Uint8Array(buf), offset);
-            offset += buf.byteLength;
-          }
-
-          logInfo('ECHO', STATUS_MESSAGES.PLAYING);
-          return new NextResponse(combinedBuffer.buffer, {
-            headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'kokoro' },
-          });
-        }
-      } catch (e) {
-        logError('ECHO', 'Kokoro TTS unavailable, trying cloud...');
       }
+
+      if (audioBuffers.length > 0) {
+        const totalLength = audioBuffers.reduce((acc, buf) => acc + buf.byteLength, 0);
+        const combinedBuffer = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const buf of audioBuffers) {
+          combinedBuffer.set(new Uint8Array(buf), offset);
+          offset += buf.byteLength;
+        }
+
+        logInfo('ECHO', STATUS_MESSAGES.PLAYING);
+        return new NextResponse(combinedBuffer.buffer, {
+          headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'kokoro' },
+        });
+      }
+    } catch (e) {
+      logError('ECHO', 'Kokoro TTS unavailable');
     }
 
     // Fallback: return silent audio
