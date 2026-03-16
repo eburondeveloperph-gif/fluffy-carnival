@@ -1,103 +1,122 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-
-let session: any = null;
-let responseQueue: LiveServerMessage[] = [];
-let ai: GoogleGenAI | null = null;
-
-async function waitForMessage(): Promise<LiveServerMessage> {
-  while (responseQueue.length === 0) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return responseQueue.shift()!;
-}
+import {
+  sanitizeErrorMessage,
+  logInfo,
+  logError,
+  STATUS_MESSAGES,
+} from '@/lib/orbit/config/serviceAliases';
 
 /**
  * Echo TTS API
  *
- * Uses Gemini Live Audio for text-to-speech.
+ * Uses Cartesia Sonic 3 for multilingual TTS.
  */
 export async function POST(request: Request) {
   try {
-    const { text, voice = 'Kore' } = await request.json();
+    const { text, language = 'en' } = await request.json();
 
     if (!text) {
       return NextResponse.json({ error: 'Missing text parameter' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      // Fallback: return silent audio
-      const silentBuffer = new Float32Array(24000 * 0.5);
-      return new NextResponse(silentBuffer.buffer as ArrayBuffer, {
-        headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'fallback' },
-      });
-    }
+    logInfo('ECHO', `Synthesizing: ${text.substring(0, 50)}...`);
 
-    if (!ai) {
-      ai = new GoogleGenAI({ apiKey });
-    }
+    // Map frontend languages to Cartesia language codes
+    const langMap: Record<string, string> = {
+      'Tagalog-English mix (Taglish)': 'tl',
+      Tagalog: 'tl',
+      Spanish: 'es',
+      French: 'fr',
+      German: 'de',
+      Japanese: 'ja',
+      Chinese: 'zh',
+      Korean: 'ko',
+      Dutch: 'nl',
+      English: 'en',
+    };
+    const cartesiaLang = langMap[language] || 'en';
 
-    const model = 'gemini-2.0-flash-live-001';
+    // Try Cartesia first
+    const cartesiaKey = process.env.CARTESIA_API_KEY;
+    if (cartesiaKey) {
+      try {
+        logInfo('ECHO', 'Using Cartesia Sonic 3...');
 
-    session = await ai.live.connect({
-      model,
-      callbacks: {
-        onopen: () => {},
-        onmessage: (msg: LiveServerMessage) => responseQueue.push(msg),
-        onerror: (e: any) => console.error('Error:', e),
-        onclose: () => {},
-      },
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voice },
-          },
-        },
-      },
-    });
+        // Split into sentences for better synthesis
+        const sentences = text.split(/(?<=[.!?])\s+/).filter((s: string) => s.trim());
 
-    // Split into sentences for smoother streaming
-    const sentences = text.split(/(?<=[.!?])\s+/).filter((s: string) => s.trim());
-    const audioChunks: string[] = [];
-    let fullText = '';
+        const audioBuffers: ArrayBuffer[] = [];
 
-    for (const sentence of sentences) {
-      responseQueue = [];
-      session.sendClientContent({ turns: [sentence] });
+        for (const sentence of sentences) {
+          const cleanSentence = sentence.trim();
+          if (!cleanSentence) continue;
 
-      let done = false;
-      while (!done) {
-        const msg = await waitForMessage();
-        const part = msg.serverContent?.modelTurn?.parts?.[0];
+          const response = await fetch('https://api.cartesia.ai/tts/bytes', {
+            method: 'POST',
+            headers: {
+              'Cartesia-Version': '2025-04-16',
+              'X-API-Key': cartesiaKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model_id: 'sonic-3',
+              transcript: cleanSentence,
+              voice: {
+                mode: 'id',
+                id: '87286a8d-7ea7-4235-a41a-dd9fa6630feb', // Multilingual voice
+              },
+              output_format: {
+                container: 'wav',
+                encoding: 'pcm_f32le',
+                sample_rate: 44100,
+              },
+              language: cartesiaLang,
+              speed: 'normal',
+              generation_config: {
+                speed: 1,
+                volume: 1,
+                emotion: 'neutral',
+              },
+            }),
+          });
 
-        if (part?.text) fullText += part.text;
-        if (part?.inlineData?.data) audioChunks.push(part.inlineData.data);
-        if (msg.serverContent?.turnComplete) done = true;
+          if (response.ok) {
+            const buffer = await response.arrayBuffer();
+            audioBuffers.push(buffer);
+          } else {
+            logError('ECHO', `Cartesia error: ${response.status}`);
+          }
+        }
+
+        if (audioBuffers.length > 0) {
+          // Combine audio buffers
+          const totalLength = audioBuffers.reduce((acc, buf) => acc + buf.byteLength, 0);
+          const combined = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const buf of audioBuffers) {
+            combined.set(new Uint8Array(buf), offset);
+            offset += buf.byteLength;
+          }
+
+          logInfo('ECHO', STATUS_MESSAGES.PLAYING);
+          return new NextResponse(combined.buffer, {
+            headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'cartesia' },
+          });
+        }
+      } catch (e) {
+        logError('ECHO', 'Cartesia unavailable');
       }
     }
 
-    session.close();
-    session = null;
-
-    // Convert base64 chunks to binary
-    if (audioChunks.length > 0) {
-      const combined = audioChunks.join('');
-      const binary = Buffer.from(combined, 'base64');
-      return new NextResponse(binary, {
-        headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'gemini-live' },
-      });
-    }
-
-    // Fallback
-    const silentBuffer = new Float32Array(24000 * 0.5);
+    // Fallback: return silent audio
+    logInfo('ECHO', 'Using fallback silent audio');
+    const silentBuffer = new Float32Array(44100 * 0.5);
     return new NextResponse(silentBuffer.buffer as ArrayBuffer, {
       headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'fallback' },
     });
   } catch (error) {
-    console.error('TTS error:', error);
-    const silentBuffer = new Float32Array(24000 * 0.5);
+    logError('ECHO', error);
+    const silentBuffer = new Float32Array(44100 * 0.5);
     return new NextResponse(silentBuffer.buffer as ArrayBuffer, {
       headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'fallback' },
     });
