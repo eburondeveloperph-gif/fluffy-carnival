@@ -30,51 +30,47 @@ export async function POST(request: Request) {
 
     logInfo('ECHO', `Processing translation request to ${targetLang}`);
 
-    // Try Eburon Translate (Google Translate) first - free, fast
-    const googleKey = process.env.GOOGLE_TRANSLATE_API_KEY || process.env.GEMINI_API_KEY;
-    if (googleKey) {
-      try {
-        logInfo('ECHO', 'Using Google Translate...');
+    // Try Eburon Translate (Google Translate web) - no API key needed
+    try {
+      logInfo('ECHO', 'Using Eburon Translate (Google)...');
 
-        // Map target languages to Google Translate codes
-        const langMap: Record<string, string> = {
-          'Tagalog-English mix (Taglish)': 'tl',
-          Spanish: 'es',
-          French: 'fr',
-          German: 'de',
-          Japanese: 'ja',
-          Chinese: 'zh-CN',
-          Korean: 'ko',
-          Portuguese: 'pt',
-          Italian: 'it',
-          Russian: 'ru',
-        };
-        const targetCode = langMap[targetLang] || 'en';
+      // Map target languages to Google Translate codes
+      const langMap: Record<string, string> = {
+        'Tagalog-English mix (Taglish)': 'tl',
+        Spanish: 'es',
+        French: 'fr',
+        German: 'de',
+        Japanese: 'ja',
+        Chinese: 'zh-CN',
+        'Chinese Simplified': 'zh-CN',
+        'Chinese Traditional': 'zh-TW',
+        Korean: 'ko',
+        Portuguese: 'pt',
+        Italian: 'it',
+        Russian: 'ru',
+        Dutch: 'nl',
+        Tagalog: 'tl',
+        English: 'en',
+      };
+      const targetCode = langMap[targetLang] || 'en';
 
-        const googleResponse = await fetch(
-          `https://translation.googleapis.com/language/translate/v2?key=${googleKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              q: text,
-              target: targetCode,
-              format: 'text',
-            }),
-          },
-        );
+      // Use Google Translate web endpoint (no API key needed)
+      const encodedText = encodeURIComponent(text);
+      const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetCode}&dt=t&q=${encodedText}`;
 
-        if (googleResponse.ok) {
-          const data = await googleResponse.json();
-          const translation = data.data?.translations?.[0]?.translatedText;
-          if (translation) {
-            logInfo('ECHO', STATUS_MESSAGES.COMPLETE);
-            return NextResponse.json({ translation });
-          }
+      const googleResponse = await fetch(googleUrl);
+
+      if (googleResponse.ok) {
+        const data = await googleResponse.json();
+        // Response is array: [[translatedText, originalText, ...], ...]
+        const translation = data[0]?.[0]?.[0];
+        if (translation) {
+          logInfo('ECHO', STATUS_MESSAGES.COMPLETE);
+          return NextResponse.json({ translation });
         }
-      } catch (e) {
-        logError('ECHO', 'Google Translate failed, trying next...');
       }
+    } catch (e) {
+      logError('ECHO', 'Eburon Translate failed, trying next...');
     }
 
     // Try Ollama (if configured)
