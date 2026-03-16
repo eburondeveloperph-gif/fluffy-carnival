@@ -29,6 +29,32 @@ export async function POST(request: Request) {
 
     logInfo('ECHO', `Synthesizing ${text.length} characters`);
 
+    // Try local Ollama TTS first
+    const ollamaUrl = process.env.OLLAMA_BASE_URL;
+    if (ollamaUrl) {
+      try {
+        logInfo('ECHO', 'Using local Ollama TTS...');
+        const ollamaResponse = await fetch(`${ollamaUrl}/api/tts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: process.env.OLLAMA_TTS_MODEL || 'qwen2-tts-medium',
+            text: text,
+          }),
+        });
+
+        if (ollamaResponse.ok) {
+          const buffer = await ollamaResponse.arrayBuffer();
+          logInfo('ECHO', STATUS_MESSAGES.PLAYING);
+          return new NextResponse(buffer, {
+            headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'ollama' },
+          });
+        }
+      } catch (e) {
+        logError('ECHO', 'Ollama TTS unavailable, trying cloud...');
+      }
+    }
+
     const apiKey = process.env.ORBIT_API_KEY || process.env.CARTESIA_API_KEY;
 
     // No API key - return silent audio
