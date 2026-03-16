@@ -21,7 +21,7 @@
 // ============================================
 
 // Single model for everything: STT + Translation + TTS
-const ECHO_MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025';
+const ECHO_MODEL = 'gemini-2.0-flash';
 
 // Whitelist (single model does it all)
 const WHITELISTED_MODELS: Record<string, readonly string[]> = {
