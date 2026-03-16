@@ -23,6 +23,7 @@ import { RoomState } from '@/lib/orbit/types';
 import { ChatPanel } from '@/lib/ChatPanel';
 import { ParticipantsPanel } from '@/lib/ParticipantsPanel';
 import { OrbitTranslatorPanel } from '@/lib/orbit/components/OrbitTranslatorPanel';
+import { TranslatorIframe } from '@/lib/orbit/components/TranslatorIframe';
 import { LiveCaptions } from '@/lib/LiveCaptions';
 import { CustomPreJoin } from '@/lib/CustomPreJoin';
 import { useDeepgramLive } from '@/lib/orbit/hooks/useDeepgramLive';
@@ -821,34 +822,7 @@ function RoomInner(props: {
           />
         );
       case 'orbit':
-        return (
-          <OrbitTranslatorPanel
-            roomCode={roomName}
-            userId={user?.id}
-            isSourceSpeaker={roomState?.activeSpeaker?.userId === user?.id}
-            currentSpeakerId={roomState?.activeSpeaker?.userId}
-            currentSpeakerName={roomState?.activeSpeaker?.userId?.split('__')[0]}
-            onRequestFloor={async () =>
-              roomName && user?.id ? await tryAcquireSpeaker(roomName, user.id, false) : false
-            }
-            onReleaseFloor={async () =>
-              roomName && user?.id && (await releaseSpeaker(roomName, user.id))
-            }
-            isListening={isListening}
-            setIsListening={setIsListening}
-            targetLanguage={targetLanguage}
-            setTargetLanguage={setTargetLanguage}
-            incomingTranslations={translator.incomingTranslations}
-            isProcessing={translator.isProcessing}
-            error={translator.error}
-            // New props for sidebar settings
-            hearRawAudio={hearRawAudio}
-            setHearRawAudio={setHearRawAudio}
-            orbitMicState={orbitMicState}
-            sourceLanguage={sourceLanguage}
-            setSourceLanguage={setSourceLanguage}
-          />
-        );
+        return <TranslatorIframe targetLanguage={targetLanguage} />;
       default:
         return null;
     }
