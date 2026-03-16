@@ -1,83 +1,147 @@
 import { NextResponse } from 'next/server';
-import {
-  sanitizeErrorMessage,
-  logInfo,
-  logError,
-  STATUS_MESSAGES,
-} from '@/lib/orbit/config/serviceAliases';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 
-/**
- * Eburon AI Translation API
- *
- * Translates text using Google Translate (free, no API key).
- */
+let session: any = null;
+let responseQueue: LiveServerMessage[] = [];
+let ai: GoogleGenAI | null = null;
+
+async function waitForMessage(): Promise<LiveServerMessage> {
+  while (responseQueue.length === 0) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return responseQueue.shift()!;
+}
+
+function handleAudioMessage(message: LiveServerMessage): string | null {
+  const parts = message.serverContent?.modelTurn?.parts;
+  if (!parts || parts.length === 0) return null;
+
+  for (const part of parts) {
+    if (part.text) return part.text;
+    if (part.inlineData) {
+      return `[audio:${part.inlineData.mimeType}]`;
+    }
+  }
+  return null;
+}
+
 export async function POST(request: Request) {
   try {
-    const { text, targetLang } = await request.json();
+    const { text, targetLang, mode = 'translate' } = await request.json();
 
-    if (!text || !targetLang) {
-      return NextResponse.json(
-        {
-          error: 'Missing required parameters',
-          message: 'Please provide text and target language.',
+    if (!text && mode === 'translate') {
+      return NextResponse.json({ error: 'Missing text parameter' }, { status: 400 });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 });
+    }
+
+    if (!ai) {
+      ai = new GoogleGenAI({ apiKey });
+    }
+
+    const model = 'gemini-2.0-flash-live-001';
+
+    if (mode === 'tts') {
+      // Generate audio response
+      session = await ai.live.connect({
+        model,
+        callbacks: {
+          onopen: () => {},
+          onmessage: (msg: LiveServerMessage) => responseQueue.push(msg),
+          onerror: (e: any) => console.error('Error:', e),
+          onclose: () => {},
         },
-        { status: 400 },
-      );
-    }
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
+            },
+          },
+        },
+      });
 
-    logInfo('ECHO', `Processing translation to ${targetLang}`);
+      session.sendClientContent({ turns: [text] });
 
-    // Map target languages to Google Translate codes
-    const langMap: Record<string, string> = {
-      'Tagalog-English mix (Taglish)': 'tl',
-      Spanish: 'es',
-      French: 'fr',
-      German: 'de',
-      Japanese: 'ja',
-      Chinese: 'zh-CN',
-      'Chinese Simplified': 'zh-CN',
-      'Chinese Traditional': 'zh-TW',
-      Korean: 'ko',
-      Portuguese: 'pt',
-      Italian: 'it',
-      Russian: 'ru',
-      Dutch: 'nl',
-      Tagalog: 'tl',
-      English: 'en',
-    };
-    const targetCode = langMap[targetLang] || 'en';
+      const audioChunks: string[] = [];
+      let done = false;
+      let fullText = '';
 
-    // Use Google Translate web endpoint (no API key needed)
-    const encodedText = encodeURIComponent(text);
-    const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetCode}&dt=t&q=${encodedText}`;
+      while (!done) {
+        const msg = await waitForMessage();
+        const part = msg.serverContent?.modelTurn?.parts?.[0];
 
-    const googleResponse = await fetch(googleUrl);
-
-    if (googleResponse.ok) {
-      const data = await googleResponse.json();
-      const translation = data[0]?.[0]?.[0];
-      if (translation) {
-        logInfo('ECHO', STATUS_MESSAGES.COMPLETE);
-        return NextResponse.json({ translation });
+        if (part?.text) fullText += part.text;
+        if (part?.inlineData?.data) audioChunks.push(part.inlineData.data);
+        if (msg.serverContent?.turnComplete) done = true;
       }
+
+      session.close();
+      session = null;
+      responseQueue = [];
+
+      return NextResponse.json({
+        translation: fullText,
+        audioChunks,
+      });
     }
 
-    logError('ECHO', 'Translation failed');
-    return NextResponse.json(
-      {
-        error: STATUS_MESSAGES.ERROR,
-        message: 'Translation service unavailable.',
+    // Translation mode
+    const langMap: Record<string, string> = {
+      'Tagalog-English mix (Taglish)': 'Filipino',
+      Spanish: 'Spanish',
+      French: 'French',
+      German: 'German',
+      Japanese: 'Japanese',
+      Chinese: 'Chinese',
+      Korean: 'Korean',
+      Dutch: 'Dutch',
+      English: 'English',
+    };
+    const targetLanguage = langMap[targetLang] || 'English';
+
+    session = await ai.live.connect({
+      model,
+      callbacks: {
+        onopen: () => {},
+        onmessage: (msg: LiveServerMessage) => responseQueue.push(msg),
+        onerror: (e: any) => console.error('Error:', e),
+        onclose: () => {},
       },
-      { status: 503 },
-    );
+      config: {
+        responseModalities: [Modality.TEXT],
+      },
+    });
+
+    const prompt = `Translate the following text to ${targetLanguage}. Output ONLY the translated text:\n\n${text}`;
+    session.sendClientContent({ turns: [prompt] });
+
+    let translation = '';
+    let done = false;
+    const audioChunks: string[] = [];
+
+    while (!done) {
+      const msg = await waitForMessage();
+      const part = msg.serverContent?.modelTurn?.parts?.[0];
+
+      if (part?.text) translation += part.text;
+      if (part?.inlineData?.data) audioChunks.push(part.inlineData.data);
+      if (msg.serverContent?.turnComplete) done = true;
+    }
+
+    session.close();
+    session = null;
+    responseQueue = [];
+
+    return NextResponse.json({
+      translation: translation.trim(),
+      audioChunks,
+    });
   } catch (error) {
-    logError('ECHO', error);
-    return NextResponse.json(
-      {
-        error: STATUS_MESSAGES.ERROR,
-        message: sanitizeErrorMessage(error),
-      },
-      { status: 500 },
-    );
+    console.error('Gemini Live error:', error);
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 500 });
   }
 }

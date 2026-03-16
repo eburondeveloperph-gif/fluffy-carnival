@@ -1,107 +1,105 @@
 import { NextResponse } from 'next/server';
-import {
-  sanitizeErrorMessage,
-  logInfo,
-  logError,
-  STATUS_MESSAGES,
-  SERVICE_ALIASES,
-} from '@/lib/orbit/config/serviceAliases';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+
+let session: any = null;
+let responseQueue: LiveServerMessage[] = [];
+let ai: GoogleGenAI | null = null;
+
+async function waitForMessage(): Promise<LiveServerMessage> {
+  while (responseQueue.length === 0) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return responseQueue.shift()!;
+}
 
 /**
  * Echo TTS API
  *
- * Synthesizes speech using Kokoro TTS.
+ * Uses Gemini Live Audio for text-to-speech.
  */
 export async function POST(request: Request) {
   try {
-    const { text, provider = 'echo' } = await request.json();
+    const { text, voice = 'Kore' } = await request.json();
 
     if (!text) {
-      return NextResponse.json(
-        {
-          error: 'Missing text parameter',
-          message: 'Please provide text to synthesize.',
+      return NextResponse.json({ error: 'Missing text parameter' }, { status: 400 });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      // Fallback: return silent audio
+      const silentBuffer = new Float32Array(24000 * 0.5);
+      return new NextResponse(silentBuffer.buffer as ArrayBuffer, {
+        headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'fallback' },
+      });
+    }
+
+    if (!ai) {
+      ai = new GoogleGenAI({ apiKey });
+    }
+
+    const model = 'gemini-2.0-flash-live-001';
+
+    session = await ai.live.connect({
+      model,
+      callbacks: {
+        onopen: () => {},
+        onmessage: (msg: LiveServerMessage) => responseQueue.push(msg),
+        onerror: (e: any) => console.error('Error:', e),
+        onclose: () => {},
+      },
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: voice },
+          },
         },
-        { status: 400 },
-      );
-    }
-
-    logInfo('ECHO', `Synthesizing ${text.length} characters`);
-
-    // Try Kokoro TTS (local) - per sentence
-    const kokoroUrl = process.env.KOKORO_URL || 'http://localhost:5000';
-    try {
-      logInfo('ECHO', 'Using Kokoro TTS...');
-
-      // Split text into sentences
-      const sentences = text.split(/(?<=[.!?])\s+/).filter((s: string) => s.trim().length > 0);
-      logInfo('ECHO', `Processing ${sentences.length} sentences`);
-
-      const audioBuffers: ArrayBuffer[] = [];
-
-      for (const sentence of sentences) {
-        const cleanSentence = sentence.trim();
-        if (!cleanSentence) continue;
-
-        logInfo('ECHO', `Synthesizing: ${cleanSentence}`);
-
-        const kokoroResponse = await fetch(`${kokoroUrl}/tts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: cleanSentence,
-            voice: process.env.KOKORO_VOICE || 'af_sarah',
-          }),
-        });
-
-        if (kokoroResponse.ok) {
-          const buffer = await kokoroResponse.arrayBuffer();
-          audioBuffers.push(buffer);
-        } else {
-          logError('ECHO', `Failed: ${kokoroResponse.status}`);
-        }
-      }
-
-      if (audioBuffers.length > 0) {
-        const totalLength = audioBuffers.reduce((acc, buf) => acc + buf.byteLength, 0);
-        const combinedBuffer = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const buf of audioBuffers) {
-          combinedBuffer.set(new Uint8Array(buf), offset);
-          offset += buf.byteLength;
-        }
-
-        logInfo('ECHO', STATUS_MESSAGES.PLAYING);
-        return new NextResponse(combinedBuffer.buffer, {
-          headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'kokoro' },
-        });
-      }
-    } catch (e) {
-      logError('ECHO', 'Kokoro TTS unavailable');
-    }
-
-    // Fallback: return silent audio
-    logInfo('ECHO', 'Using fallback silent audio');
-
-    const sampleRate = 24000;
-    const duration = 0.5;
-    const numSamples = sampleRate * duration;
-    const silentBuffer = new Float32Array(numSamples);
-
-    return new NextResponse(silentBuffer.buffer as ArrayBuffer, {
-      headers: {
-        'Content-Type': 'audio/wav',
-        'X-Eburon-TTS-Mode': 'fallback',
       },
     });
+
+    // Split into sentences for smoother streaming
+    const sentences = text.split(/(?<=[.!?])\s+/).filter((s: string) => s.trim());
+    const audioChunks: string[] = [];
+    let fullText = '';
+
+    for (const sentence of sentences) {
+      responseQueue = [];
+      session.sendClientContent({ turns: [sentence] });
+
+      let done = false;
+      while (!done) {
+        const msg = await waitForMessage();
+        const part = msg.serverContent?.modelTurn?.parts?.[0];
+
+        if (part?.text) fullText += part.text;
+        if (part?.inlineData?.data) audioChunks.push(part.inlineData.data);
+        if (msg.serverContent?.turnComplete) done = true;
+      }
+    }
+
+    session.close();
+    session = null;
+
+    // Convert base64 chunks to binary
+    if (audioChunks.length > 0) {
+      const combined = audioChunks.join('');
+      const binary = Buffer.from(combined, 'base64');
+      return new NextResponse(binary, {
+        headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'gemini-live' },
+      });
+    }
+
+    // Fallback
+    const silentBuffer = new Float32Array(24000 * 0.5);
+    return new NextResponse(silentBuffer.buffer as ArrayBuffer, {
+      headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'fallback' },
+    });
   } catch (error) {
-    logError('ECHO', error);
-    return NextResponse.json(
-      {
-        error: STATUS_MESSAGES.ERROR,
-        message: sanitizeErrorMessage(error),
-      },
-      { status: 500 },
-    );
+    console.error('TTS error:', error);
+    const silentBuffer = new Float32Array(24000 * 0.5);
+    return new NextResponse(silentBuffer.buffer as ArrayBuffer, {
+      headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'fallback' },
+    });
   }
 }
