@@ -30,11 +30,58 @@ export async function POST(request: Request) {
 
     logInfo('ECHO', `Processing translation request to ${targetLang}`);
 
-    // Try Ollama first (ifconfigured)
+    // Try Eburon Translate (Google Translate) first - free, fast
+    const googleKey = process.env.GOOGLE_TRANSLATE_API_KEY || process.env.GEMINI_API_KEY;
+    if (googleKey) {
+      try {
+        logInfo('ECHO', 'Using Google Translate...');
+
+        // Map target languages to Google Translate codes
+        const langMap: Record<string, string> = {
+          'Tagalog-English mix (Taglish)': 'tl',
+          Spanish: 'es',
+          French: 'fr',
+          German: 'de',
+          Japanese: 'ja',
+          Chinese: 'zh-CN',
+          Korean: 'ko',
+          Portuguese: 'pt',
+          Italian: 'it',
+          Russian: 'ru',
+        };
+        const targetCode = langMap[targetLang] || 'en';
+
+        const googleResponse = await fetch(
+          `https://translation.googleapis.com/language/translate/v2?key=${googleKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              q: text,
+              target: targetCode,
+              format: 'text',
+            }),
+          },
+        );
+
+        if (googleResponse.ok) {
+          const data = await googleResponse.json();
+          const translation = data.data?.translations?.[0]?.translatedText;
+          if (translation) {
+            logInfo('ECHO', STATUS_MESSAGES.COMPLETE);
+            return NextResponse.json({ translation });
+          }
+        }
+      } catch (e) {
+        logError('ECHO', 'Google Translate failed, trying next...');
+      }
+    }
+
+    // Try Ollama (if configured)
     const ollamaUrl = process.env.OLLAMA_BASE_URL;
     if (ollamaUrl) {
       try {
-        logInfo('ECHO', 'Using local Eburon AI instance...');
+        logInfo('ECHO', 'Using local Ollama...');
 
         const olResponse = await fetch(`${ollamaUrl}/api/generate`, {
           method: 'POST',
@@ -55,7 +102,7 @@ export async function POST(request: Request) {
           }
         }
       } catch (e) {
-        logError('ECHO', 'Local instance unavailable, using cloud...');
+        logError('ECHO', 'Ollama unavailable, trying next...');
       }
     }
 

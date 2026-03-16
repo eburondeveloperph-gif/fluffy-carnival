@@ -29,24 +29,53 @@ export async function POST(request: Request) {
 
     logInfo('ECHO', `Synthesizing ${text.length} characters`);
 
-    // Try local Ollama TTS first
+    // Try local Ollama Qwen TTS first - per sentence
     const ollamaUrl = process.env.OLLAMA_BASE_URL;
     if (ollamaUrl) {
       try {
-        logInfo('ECHO', 'Using local Ollama TTS...');
-        const ollamaResponse = await fetch(`${ollamaUrl}/api/tts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: process.env.OLLAMA_TTS_MODEL || 'qwen2-tts-medium',
-            text: text,
-          }),
-        });
+        logInfo('ECHO', 'Using local Qwen TTS...');
 
-        if (ollamaResponse.ok) {
-          const buffer = await ollamaResponse.arrayBuffer();
+        // Split text into sentences
+        const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
+        logInfo('ECHO', `Processing ${sentences.length} sentences`);
+
+        const audioBuffers: ArrayBuffer[] = [];
+
+        for (const sentence of sentences) {
+          const cleanSentence = sentence.trim();
+          if (!cleanSentence) continue;
+
+          logInfo('ECHO', `Synthesizing sentence: ${cleanSentence}`);
+
+          const ollamaResponse = await fetch(`${ollamaUrl}/api/tts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: process.env.OLLAMA_TTS_MODEL || 'qwen2-tts-medium',
+              text: cleanSentence,
+            }),
+          });
+
+          if (ollamaResponse.ok) {
+            const buffer = await ollamaResponse.arrayBuffer();
+            audioBuffers.push(buffer);
+          } else {
+            logError('ECHO', `Failed to synthesize: ${cleanSentence}`);
+          }
+        }
+
+        if (audioBuffers.length > 0) {
+          // Combine all audio buffers
+          const totalLength = audioBuffers.reduce((acc, buf) => acc + buf.byteLength, 0);
+          const combinedBuffer = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const buf of audioBuffers) {
+            combinedBuffer.set(new Uint8Array(buf), offset);
+            offset += buf.byteLength;
+          }
+
           logInfo('ECHO', STATUS_MESSAGES.PLAYING);
-          return new NextResponse(buffer, {
+          return new NextResponse(combinedBuffer.buffer, {
             headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'ollama' },
           });
         }

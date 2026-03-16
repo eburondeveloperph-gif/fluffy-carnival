@@ -34,8 +34,8 @@ const WHITELISTED_MODELS: Record<string, readonly string[]> = {
 // Provider whitelist
 const WHITELISTED_PROVIDERS: Record<string, readonly string[]> = {
   STT: ['gemini-live'],
-  TRANSLATION: ['gemini', 'deepseek', 'ollama'],
-  TTS: ['cartesia'],
+  TRANSLATION: ['google-translate', 'gemini', 'deepseek', 'ollama'],
+  TTS: ['cartesia', 'ollama'],
 } as const;
 
 // ============================================
