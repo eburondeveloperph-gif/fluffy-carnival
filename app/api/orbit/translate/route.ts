@@ -1,147 +1,107 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import {
+  sanitizeErrorMessage,
+  logInfo,
+  logError,
+  STATUS_MESSAGES,
+} from '@/lib/orbit/config/serviceAliases';
 
-let session: any = null;
-let responseQueue: LiveServerMessage[] = [];
-let ai: GoogleGenAI | null = null;
-
-async function waitForMessage(): Promise<LiveServerMessage> {
-  while (responseQueue.length === 0) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return responseQueue.shift()!;
-}
-
-function handleAudioMessage(message: LiveServerMessage): string | null {
-  const parts = message.serverContent?.modelTurn?.parts;
-  if (!parts || parts.length === 0) return null;
-
-  for (const part of parts) {
-    if (part.text) return part.text;
-    if (part.inlineData) {
-      return `[audio:${part.inlineData.mimeType}]`;
-    }
-  }
-  return null;
-}
-
+/**
+ * Echo Translation API
+ *
+ * Uses Gemini first, falls back to Google Translate.
+ */
 export async function POST(request: Request) {
   try {
-    const { text, targetLang, mode = 'translate' } = await request.json();
+    const { text, targetLang } = await request.json();
 
-    if (!text && mode === 'translate') {
-      return NextResponse.json({ error: 'Missing text parameter' }, { status: 400 });
+    if (!text || !targetLang) {
+      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 });
-    }
+    logInfo('ECHO', `Translating to ${targetLang}`);
 
-    if (!ai) {
-      ai = new GoogleGenAI({ apiKey });
-    }
-
-    const model = 'gemini-2.0-flash-live-001';
-
-    if (mode === 'tts') {
-      // Generate audio response
-      session = await ai.live.connect({
-        model,
-        callbacks: {
-          onopen: () => {},
-          onmessage: (msg: LiveServerMessage) => responseQueue.push(msg),
-          onerror: (e: any) => console.error('Error:', e),
-          onclose: () => {},
-        },
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
-          },
-        },
-      });
-
-      session.sendClientContent({ turns: [text] });
-
-      const audioChunks: string[] = [];
-      let done = false;
-      let fullText = '';
-
-      while (!done) {
-        const msg = await waitForMessage();
-        const part = msg.serverContent?.modelTurn?.parts?.[0];
-
-        if (part?.text) fullText += part.text;
-        if (part?.inlineData?.data) audioChunks.push(part.inlineData.data);
-        if (msg.serverContent?.turnComplete) done = true;
-      }
-
-      session.close();
-      session = null;
-      responseQueue = [];
-
-      return NextResponse.json({
-        translation: fullText,
-        audioChunks,
-      });
-    }
-
-    // Translation mode
+    // Map target languages
     const langMap: Record<string, string> = {
-      'Tagalog-English mix (Taglish)': 'Filipino',
-      Spanish: 'Spanish',
-      French: 'French',
-      German: 'German',
-      Japanese: 'Japanese',
-      Chinese: 'Chinese',
-      Korean: 'Korean',
-      Dutch: 'Dutch',
-      English: 'English',
+      'Tagalog-English mix (Taglish)': 'tl',
+      Spanish: 'es',
+      French: 'fr',
+      German: 'de',
+      Japanese: 'ja',
+      Chinese: 'zh-CN',
+      Korean: 'ko',
+      Dutch: 'nl',
+      Portuguese: 'pt',
+      Italian: 'it',
+      Russian: 'ru',
+      Tagalog: 'tl',
+      English: 'en',
     };
-    const targetLanguage = langMap[targetLang] || 'English';
+    const targetCode = langMap[targetLang] || 'en';
 
-    session = await ai.live.connect({
-      model,
-      callbacks: {
-        onopen: () => {},
-        onmessage: (msg: LiveServerMessage) => responseQueue.push(msg),
-        onerror: (e: any) => console.error('Error:', e),
-        onclose: () => {},
-      },
-      config: {
-        responseModalities: [Modality.TEXT],
-      },
-    });
+    // Try Gemini first
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        logInfo('ECHO', 'Using Gemini...');
 
-    const prompt = `Translate the following text to ${targetLanguage}. Output ONLY the translated text:\n\n${text}`;
-    session.sendClientContent({ turns: [prompt] });
+        const geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `Translate to ${targetLang}. Output ONLY the translated text:\n\n${text}`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: { temperature: 0.1 },
+            }),
+          },
+        );
 
-    let translation = '';
-    let done = false;
-    const audioChunks: string[] = [];
-
-    while (!done) {
-      const msg = await waitForMessage();
-      const part = msg.serverContent?.modelTurn?.parts?.[0];
-
-      if (part?.text) translation += part.text;
-      if (part?.inlineData?.data) audioChunks.push(part.inlineData.data);
-      if (msg.serverContent?.turnComplete) done = true;
+        if (geminiResponse.ok) {
+          const data = await geminiResponse.json();
+          const translation = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (translation) {
+            logInfo('ECHO', STATUS_MESSAGES.COMPLETE);
+            return NextResponse.json({ translation });
+          }
+        }
+      } catch (e) {
+        logError('ECHO', 'Gemini failed, trying Google Translate...');
+      }
     }
 
-    session.close();
-    session = null;
-    responseQueue = [];
+    // Fallback: Google Translate
+    try {
+      logInfo('ECHO', 'Using Google Translate...');
 
-    return NextResponse.json({
-      translation: translation.trim(),
-      audioChunks,
-    });
+      const encodedText = encodeURIComponent(text);
+      const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetCode}&dt=t&q=${encodedText}`;
+
+      const googleResponse = await fetch(googleUrl);
+
+      if (googleResponse.ok) {
+        const data = await googleResponse.json();
+        const translation = data[0]?.[0]?.[0];
+        if (translation) {
+          logInfo('ECHO', STATUS_MESSAGES.COMPLETE);
+          return NextResponse.json({ translation });
+        }
+      }
+    } catch (e) {
+      logError('ECHO', 'Google Translate also failed');
+    }
+
+    return NextResponse.json({ error: 'Translation unavailable' }, { status: 503 });
   } catch (error) {
-    console.error('Gemini Live error:', error);
-    return NextResponse.json({ error: 'Service unavailable' }, { status: 500 });
+    logError('ECHO', error);
+    return NextResponse.json({ error: sanitizeErrorMessage(error) }, { status: 500 });
   }
 }
