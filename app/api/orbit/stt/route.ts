@@ -9,8 +9,7 @@ import {
 /**
  * Echo STT API
  *
- * Transcribes audio using Echo STT Engine.
- * Never exposes internal provider names in errors or responses.
+ * Transcribes audio using local Whisper server.
  */
 export async function POST(request: Request) {
   try {
@@ -30,68 +29,46 @@ export async function POST(request: Request) {
 
     logInfo('ECHO', `Processing audio (${audioBlob.size} bytes, language: ${language})`);
 
-    const apiKey = process.env.DEEPGRAM_API_KEY || process.env.ORBIT_API_KEY;
-    if (!apiKey) {
-      logError('ECHO', 'No API key configured');
-      return NextResponse.json(
-        {
-          error: STATUS_MESSAGES.ERROR,
-          message: 'Echo is not configured. Please contact support.',
-        },
-        { status: 503 },
-      );
+    // Try local Whisper server first
+    const whisperUrl = process.env.WHISPER_URL || 'http://localhost:7860';
+    try {
+      logInfo('ECHO', 'Using local Whisper...');
+
+      const arrayBuffer = await audioBlob.arrayBuffer();
+
+      const whisperResponse = await fetch(`${whisperUrl}/transcribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'audio/wav' },
+        body: arrayBuffer,
+      });
+
+      if (whisperResponse.ok) {
+        const data = await whisperResponse.json();
+        const transcript = data.text || '';
+
+        logInfo('ECHO', `Transcription complete (${transcript.length} chars)`);
+
+        return NextResponse.json({
+          transcript: transcript.trim(),
+          confidence: 0.9,
+          engine: 'Whisper',
+          version: 'local',
+        });
+      } else {
+        logError('ECHO', `Whisper failed: ${whisperResponse.status}`);
+      }
+    } catch (e) {
+      logError('ECHO', 'Local Whisper unavailable');
     }
 
-    // Convert blob to array buffer
-    const arrayBuffer = await audioBlob.arrayBuffer();
-
-    // Build API URL with parameters (whitelisted provider)
-    let sttUrl = 'https://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&smart_format=true';
-    if (language === 'auto') {
-      sttUrl += '&detect_language=true';
-    } else {
-      sttUrl += `&language=${language}`;
-    }
-
-    logInfo('ECHO', STATUS_MESSAGES.PROCESSING);
-
-    // Call STT API
-    const response = await fetch(sttUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Token ${apiKey}`,
-        'Content-Type': audioBlob.type || 'audio/webm',
-      },
-      body: arrayBuffer,
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      logError('ECHO', `Transcription failed: ${response.status}`);
-
-      return NextResponse.json(
-        {
-          error: STATUS_MESSAGES.ERROR,
-          message: 'Echo encountered an issue. Please try again.',
-        },
-        { status: response.status >= 500 ? 503 : 400 },
-      );
-    }
-
-    const data = await response.json();
-    const transcript = data.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
-    const confidence = data.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
-
-    logInfo(
-      'ECHO',
-      `Transcription complete (${transcript.length} chars, confidence: ${(confidence * 100).toFixed(0)}%)`,
-    );
+    // Fallback: return empty transcript
+    logInfo('ECHO', 'Using fallback (no transcription)');
 
     return NextResponse.json({
-      transcript: transcript.trim(),
-      confidence,
+      transcript: '',
+      confidence: 0,
       engine: 'Echo',
-      version: '2.5',
+      version: 'fallback',
     });
   } catch (error) {
     logError('ECHO', error);
