@@ -10,8 +10,7 @@ import {
 /**
  * Echo TTS API
  *
- * Synthesizes speech using Echo TTS (Cartesia).
- * Never exposes internal provider names in errors or responses.
+ * Synthesizes speech using Kokoro TTS.
  */
 export async function POST(request: Request) {
   try {
@@ -29,14 +28,14 @@ export async function POST(request: Request) {
 
     logInfo('ECHO', `Synthesizing ${text.length} characters`);
 
-    // Try local Ollama Qwen TTS first - per sentence
-    const ollamaUrl = process.env.OLLAMA_BASE_URL;
-    if (ollamaUrl) {
+    // Try Kokoro TTS - per sentence
+    const kokoroUrl = process.env.KOKORO_URL;
+    if (kokoroUrl) {
       try {
-        logInfo('ECHO', 'Using local Qwen TTS...');
+        logInfo('ECHO', 'Using Kokoro TTS...');
 
         // Split text into sentences
-        const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0);
+        const sentences = text.split(/(?<=[.!?])\s+/).filter((s: string) => s.trim().length > 0);
         logInfo('ECHO', `Processing ${sentences.length} sentences`);
 
         const audioBuffers: ArrayBuffer[] = [];
@@ -45,27 +44,26 @@ export async function POST(request: Request) {
           const cleanSentence = sentence.trim();
           if (!cleanSentence) continue;
 
-          logInfo('ECHO', `Synthesizing sentence: ${cleanSentence}`);
+          logInfo('ECHO', `Synthesizing: ${cleanSentence}`);
 
-          const ollamaResponse = await fetch(`${ollamaUrl}/api/tts`, {
+          const kokoroResponse = await fetch(`${kokoroUrl}/tts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: process.env.OLLAMA_TTS_MODEL || 'qwen2-tts-medium',
               text: cleanSentence,
+              voice: process.env.KOKORO_VOICE || 'af_sarah',
             }),
           });
 
-          if (ollamaResponse.ok) {
-            const buffer = await ollamaResponse.arrayBuffer();
+          if (kokoroResponse.ok) {
+            const buffer = await kokoroResponse.arrayBuffer();
             audioBuffers.push(buffer);
           } else {
-            logError('ECHO', `Failed to synthesize: ${cleanSentence}`);
+            logError('ECHO', `Failed: ${kokoroResponse.status}`);
           }
         }
 
         if (audioBuffers.length > 0) {
-          // Combine all audio buffers
           const totalLength = audioBuffers.reduce((acc, buf) => acc + buf.byteLength, 0);
           const combinedBuffer = new Uint8Array(totalLength);
           let offset = 0;
@@ -76,83 +74,26 @@ export async function POST(request: Request) {
 
           logInfo('ECHO', STATUS_MESSAGES.PLAYING);
           return new NextResponse(combinedBuffer.buffer, {
-            headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'ollama' },
+            headers: { 'Content-Type': 'audio/wav', 'X-Eburon-TTS-Mode': 'kokoro' },
           });
         }
       } catch (e) {
-        logError('ECHO', 'Ollama TTS unavailable, trying cloud...');
+        logError('ECHO', 'Kokoro TTS unavailable, trying cloud...');
       }
     }
 
-    const apiKey = process.env.ORBIT_API_KEY || process.env.CARTESIA_API_KEY;
+    // Fallback: return silent audio
+    logInfo('ECHO', 'Using fallback silent audio');
 
-    // No API key - return silent audio
-    if (!apiKey) {
-      logInfo('ECHO', 'Using fallback silent audio');
+    const sampleRate = 24000;
+    const duration = 0.5;
+    const numSamples = sampleRate * duration;
+    const silentBuffer = new Float32Array(numSamples);
 
-      // Generate 0.5s silence (fallback mode)
-      const sampleRate = 24000;
-      const duration = 0.5;
-      const numSamples = sampleRate * duration;
-      const buffer = new Float32Array(numSamples);
-      // Already initialized to 0 (silence)
-
-      return new NextResponse(buffer.buffer as ArrayBuffer, {
-        headers: {
-          'Content-Type': 'audio/wav',
-          'X-Eburon-TTS-Mode': 'fallback',
-        },
-      });
-    }
-
-    logInfo('ECHO', STATUS_MESSAGES.SYNTHESIZING);
-
-    // Use Cartesia API (whitelisted TTS provider)
-    const response = await fetch('https://api.cartesia.ai/tts/bytes', {
-      method: 'POST',
-      headers: {
-        'Cartesia-Version': process.env.CARTESIA_VERSION || '2025-04-16',
-        'X-API-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model_id: process.env.CARTESIA_MODEL_ID || 'sonic-3-latest', // Whitelisted
-        transcript: text,
-        voice: {
-          mode: 'id',
-          id: process.env.CARTESIA_VOICE_ID || 'dda33d93-9f12-4a59-806e-a98279ebf050',
-        },
-        output_format: {
-          container: 'wav',
-          encoding: 'pcm_f32le',
-          sample_rate: 24000,
-        },
-        speed: 'normal',
-        generation_config: { speed: 1, volume: 1 },
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      logError('ECHO', `Synthesis failed: ${response.status}`);
-
-      return NextResponse.json(
-        {
-          error: STATUS_MESSAGES.ERROR,
-          message: 'Echo TTS encountered an issue. Please try again.',
-        },
-        { status: response.status >= 500 ? 503 : 400 },
-      );
-    }
-
-    const buffer = await response.arrayBuffer();
-
-    logInfo('ECHO', STATUS_MESSAGES.PLAYING);
-
-    return new NextResponse(buffer, {
+    return new NextResponse(silentBuffer.buffer as ArrayBuffer, {
       headers: {
         'Content-Type': 'audio/wav',
-        'X-Eburon-TTS-Mode': 'synthesized',
+        'X-Eburon-TTS-Mode': 'fallback',
       },
     });
   } catch (error) {
