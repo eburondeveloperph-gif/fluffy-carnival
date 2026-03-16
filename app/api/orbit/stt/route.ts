@@ -9,7 +9,9 @@ import {
 /**
  * Echo STT API
  *
- * Transcribes audio using local Whisper server.
+ * Uses browser Web Speech API via client-side transcription.
+ * This endpoint serves as a placeholder - actual transcription
+ * happens in the browser using Web Speech API or WebGPU.
  */
 export async function POST(request: Request) {
   try {
@@ -27,48 +29,15 @@ export async function POST(request: Request) {
       );
     }
 
-    logInfo('ECHO', `Processing audio (${audioBlob.size} bytes, language: ${language})`);
+    logInfo('ECHO', `Received audio (${audioBlob.size} bytes)`);
 
-    // Try local Whisper server first
-    const whisperUrl = process.env.WHISPER_URL || 'http://localhost:7860';
-    try {
-      logInfo('ECHO', 'Using local Whisper...');
-
-      const arrayBuffer = await audioBlob.arrayBuffer();
-
-      const whisperResponse = await fetch(`${whisperUrl}/transcribe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'audio/wav' },
-        body: arrayBuffer,
-      });
-
-      if (whisperResponse.ok) {
-        const data = await whisperResponse.json();
-        const transcript = data.text || '';
-
-        logInfo('ECHO', `Transcription complete (${transcript.length} chars)`);
-
-        return NextResponse.json({
-          transcript: transcript.trim(),
-          confidence: 0.9,
-          engine: 'Whisper',
-          version: 'local',
-        });
-      } else {
-        logError('ECHO', `Whisper failed: ${whisperResponse.status}`);
-      }
-    } catch (e) {
-      logError('ECHO', 'Local Whisper unavailable');
-    }
-
-    // Fallback: return empty transcript
-    logInfo('ECHO', 'Using fallback (no transcription)');
-
+    // For now, return empty - transcription is handled client-side
+    // with Web Speech API or WebGPU
     return NextResponse.json({
       transcript: '',
       confidence: 0,
-      engine: 'Echo',
-      version: 'fallback',
+      engine: 'WebSpeech',
+      version: 'browser',
     });
   } catch (error) {
     logError('ECHO', error);
