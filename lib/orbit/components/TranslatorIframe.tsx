@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-
 interface TranslatorIframeProps {
   targetLanguage?: string;
 }
 
 export function TranslatorIframe({ targetLanguage = 'Spanish' }: TranslatorIframeProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const iframeSrc = `/translator.html?targetLanguage=${encodeURIComponent(targetLanguage)}`;
 
   return (
     <div
@@ -20,8 +18,7 @@ export function TranslatorIframe({ targetLanguage = 'Spanish' }: TranslatorIfram
       }}
     >
       <iframe
-        ref={iframeRef}
-        src="/translator.html"
+        src={iframeSrc}
         style={{
           width: '100%',
           height: '100%',

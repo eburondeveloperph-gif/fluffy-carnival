@@ -6,132 +6,342 @@
     <title>Success Class Translator</title>
     <style>
       :root {
-        --bg-color: #f4f7f6;
-        --card-bg: #ffffff;
-        --stt-color: #4a90e2;
-        --trans-color: #2ecc71;
-        --tts-color: #9b59b6;
-        --text-main: #333333;
-        --text-muted: #888888;
+        color-scheme: dark;
+        --bg-color: #0b0b10;
+        --panel-bg: rgba(18, 18, 24, 0.88);
+        --panel-bg-strong: rgba(10, 10, 14, 0.94);
+        --card-bg: rgba(255, 255, 255, 0.05);
+        --card-border: rgba(255, 255, 255, 0.1);
+        --gold: #d4af37;
+        --gold-soft: rgba(212, 175, 55, 0.18);
+        --stt-color: #60a5fa;
+        --trans-color: #34d399;
+        --tts-color: #a78bfa;
+        --speak-color: #2f7cf7;
+        --listen-color: #d97706;
+        --text-main: #f8fafc;
+        --text-muted: rgba(226, 232, 240, 0.62);
+        --text-soft: rgba(226, 232, 240, 0.45);
+        --shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
       }
 
       body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: var(--bg-color);
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(212, 175, 55, 0.18), transparent 34%),
+          radial-gradient(circle at top right, rgba(96, 165, 250, 0.16), transparent 30%),
+          linear-gradient(180deg, #09090c 0%, #111218 46%, #14161d 100%);
         color: var(--text-main);
-        max-width: 650px;
-        margin: 0 auto;
-        padding: 1rem;
+      }
+
+      .app-shell {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 14px;
+      }
+
+      .hero {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 16px;
+        border-radius: 20px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-topline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .hero-eyebrow {
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--gold);
+      }
+
+      .hero-pills {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .hero-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 26px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-muted);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hero-pill[data-tone="accent"] {
+        background: var(--gold-soft);
+        border-color: rgba(212, 175, 55, 0.28);
+        color: #f8df87;
+      }
+
+      .hero-pill[data-tone="live"] {
+        background: rgba(52, 211, 153, 0.16);
+        border-color: rgba(52, 211, 153, 0.3);
+        color: #6ee7b7;
+      }
+
+      .hero-pill[data-tone="warn"] {
+        background: rgba(251, 191, 36, 0.18);
+        border-color: rgba(251, 191, 36, 0.28);
+        color: #fcd34d;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.86rem;
+        line-height: 1.45;
       }
 
       .controls-container {
         width: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
       }
 
       .control-row {
-        background: var(--card-bg);
-        padding: 0.75rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        display: flex;
-        gap: 0.75rem;
-        align-items: center;
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.2fr);
+        gap: 12px;
+        padding: 12px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.03));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: var(--shadow);
+        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(20px);
       }
 
       .control-row button {
-        flex: 1;
-        padding: 0.75rem;
-        font-size: 0.9rem;
-        font-weight: bold;
+        width: 100%;
+        min-height: 62px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 0.9rem 1rem;
+        border: none;
+        border-radius: 14px;
+        font-size: 0.95rem;
+        font-weight: 700;
         cursor: pointer;
         color: white;
-        border: none;
-        border-radius: 6px;
-        transition: all 0.2s ease;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+      }
+
+      .control-row button:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+      }
+
+      .control-row button:disabled {
+        background: rgba(255, 255, 255, 0.08) !important;
+        color: rgba(226, 232, 240, 0.4) !important;
+        cursor: not-allowed;
+        opacity: 0.75;
+        box-shadow: none;
+      }
+
+      .button-icon {
+        font-size: 1rem;
       }
 
       #btnSpeaking {
-        background: #3498db;
-      }
-      #btnListening {
-        background: #e67e22;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
       }
 
-      .control-row button:hover {
-        opacity: 0.9;
-      }
-      .control-row button:disabled {
-        background: #cccccc !important;
-        cursor: not-allowed;
-        opacity: 1;
+      #btnListening {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
       }
 
       .btn-stop {
-        background: #e74c3c !important;
-        box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.2);
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+        box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.25);
+      }
+
+      .select-wrap {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 6px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(0, 0, 0, 0.24);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .select-wrap label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-soft);
       }
 
       select {
-        flex: 2;
-        padding: 0.75rem;
-        font-size: 0.9rem;
-        border-radius: 6px;
-        border: 1px solid #ddd;
-        background: #fff;
+        width: 100%;
+        padding: 0;
+        border: none;
+        background: transparent;
+        color: var(--text-main);
+        font-size: 0.94rem;
+        font-weight: 600;
         cursor: pointer;
+        outline: none;
+      }
+
+      select option {
+        color: var(--text-main);
+        background: #0e1118;
       }
 
       .pipeline {
         width: 100%;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        margin: 1rem 0;
+        gap: 10px;
       }
 
       .card {
-        background: var(--card-bg);
+        position: relative;
         width: 100%;
-        border-radius: 10px;
-        padding: 1rem;
-        box-sizing: border-box;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-        border-top: 4px solid #ccc;
-        min-height: 80px;
+        min-height: 122px;
         display: flex;
         flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 18px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035)),
+          linear-gradient(180deg, rgba(13, 16, 24, 0.96), rgba(13, 16, 24, 0.82));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: var(--shadow);
+        overflow: hidden;
       }
 
-      .card.stt {
-        border-top-color: var(--stt-color);
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.2);
       }
-      .card.translate {
-        border-top-color: var(--trans-color);
+
+      .card.stt::before {
+        background: linear-gradient(180deg, var(--stt-color), rgba(96, 165, 250, 0.32));
       }
-      .card.tts {
-        border-top-color: var(--tts-color);
+
+      .card.translate::before {
+        background: linear-gradient(180deg, var(--trans-color), rgba(52, 211, 153, 0.32));
+      }
+
+      .card.tts::before {
+        background: linear-gradient(180deg, var(--tts-color), rgba(167, 139, 250, 0.3));
       }
 
       .card-header {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-        color: var(--text-muted);
         display: flex;
+        align-items: center;
         justify-content: space-between;
+        gap: 12px;
+      }
+
+      .card-title-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .card-step {
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-soft);
+      }
+
+      .card-title {
+        font-size: 0.96rem;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .card.stt .card-title {
+        color: var(--stt-color);
+      }
+
+      .card.translate .card-title {
+        color: var(--trans-color);
+      }
+
+      .card.tts .card-title {
+        color: var(--tts-color);
+      }
+
+      .card-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 24px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-soft);
+        font-size: 0.65rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
       }
 
       .card-content {
         font-size: 1rem;
-        line-height: 1.4;
-        flex-grow: 1;
-        word-wrap: break-word;
+        line-height: 1.55;
+        word-break: break-word;
+        color: var(--text-main);
+      }
+
+      .card-content strong {
+        font-weight: 700;
       }
 
       .interim-text {
@@ -139,194 +349,395 @@
         font-style: italic;
       }
 
+      .error-text {
+        color: #fca5a5;
+      }
+
       .arrow {
-        font-size: 1.5rem;
-        color: #bdc3c7;
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: rgba(255, 255, 255, 0.35);
+        font-size: 1.35rem;
+        animation: pulse 2s infinite;
       }
 
       .status-dot {
-        height: 8px;
-        width: 8px;
-        background-color: #ccc;
+        height: 10px;
+        width: 10px;
         border-radius: 50%;
         display: inline-block;
+        background-color: rgba(255, 255, 255, 0.18);
+        box-shadow: 0 0 0 transparent;
+        transition: background-color 0.2s ease, box-shadow 0.2s ease;
       }
+
       .status-dot.active {
-        background-color: #2ecc71;
-        box-shadow: 0 0 6px #2ecc71;
+        background-color: #34d399;
+        box-shadow: 0 0 10px rgba(52, 211, 153, 0.65);
       }
+
       .status-dot.speaking {
         background-color: var(--tts-color);
-        box-shadow: 0 0 6px var(--tts-color);
+        box-shadow: 0 0 10px rgba(167, 139, 250, 0.7);
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 0.45;
+        }
+        50% {
+          transform: scale(1.08);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 0.45;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .app-shell {
+          padding: 12px;
+        }
+
+        .control-row {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-topline {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .hero-pills {
+          flex-wrap: wrap;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="controls-container">
-      <div class="control-row">
-        <button id="btnSpeaking">🎤 Speak</button>
-        <select id="langTop"></select>
-      </div>
-    </div>
-
-    <div class="pipeline">
-      <div class="card stt">
-        <div class="card-header">
-          <span style="color: var(--stt-color)">1. Orbit (STT)</span>
-          <span class="status-dot" id="stt-status"></span>
+    <div class="app-shell">
+      <header class="hero">
+        <div class="hero-topline">
+          <span class="hero-eyebrow">Success Class</span>
+          <div class="hero-pills">
+            <span class="hero-pill" data-tone="accent">Sidepanel</span>
+            <span class="hero-pill" id="modeBadge">Idle</span>
+          </div>
         </div>
-        <div class="card-content" id="stt-content">
-          <span class="interim-text">Waiting for mic...</span>
-        </div>
-      </div>
+        <h1>Orbit, Eburon, Echo</h1>
+        <p>Start from either side. The panel keeps the live speech, translation, and voice playback pipeline in view.</p>
+      </header>
 
-      <div class="arrow">↓</div>
-
-      <div class="card translate">
-        <div class="card-header">
-          <span style="color: var(--trans-color)">2. Eburon (Translation)</span>
-        </div>
-        <div class="card-content" id="trans-content">
-          <span class="interim-text">Waiting...</span>
+      <div class="controls-container">
+        <div class="control-row">
+          <button id="btnSpeaking" type="button">
+            <span class="button-icon">🎤</span>
+            <span>Start Speaking</span>
+          </button>
+          <div class="select-wrap">
+            <label for="langTop">Top Language</label>
+            <select id="langTop"></select>
+          </div>
         </div>
       </div>
 
-      <div class="arrow">↓</div>
-
-      <div class="card tts">
-        <div class="card-header">
-          <span style="color: var(--tts-color)">3. Echo (TTS)</span>
-          <span class="status-dot" id="tts-status"></span>
+      <div class="pipeline">
+        <div class="card stt">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="card-step">Step 1</span>
+              <span class="card-title">Orbit Speech to Text</span>
+            </div>
+            <div class="card-badge">
+              <span class="status-dot" id="stt-status"></span>
+            </div>
+          </div>
+          <div class="card-content" id="stt-content" aria-live="polite">
+            <span class="interim-text">Waiting for mic...</span>
+          </div>
         </div>
-        <div class="card-content" id="tts-content">
-          <span class="interim-text">Waiting...</span>
+
+        <div class="arrow" aria-hidden="true">↓</div>
+
+        <div class="card translate">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="card-step">Step 2</span>
+              <span class="card-title">Eburon Translation</span>
+            </div>
+            <div class="card-badge">Live</div>
+          </div>
+          <div class="card-content" id="trans-content" aria-live="polite">
+            <span class="interim-text">Waiting for input...</span>
+          </div>
+        </div>
+
+        <div class="arrow" aria-hidden="true">↓</div>
+
+        <div class="card tts">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="card-step">Step 3</span>
+              <span class="card-title">Echo Voice Playback</span>
+            </div>
+            <div class="card-badge">
+              <span class="status-dot" id="tts-status"></span>
+            </div>
+          </div>
+          <div class="card-content" id="tts-content" aria-live="polite">
+            <span class="interim-text">Waiting to speak...</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="controls-container">
-      <div class="control-row">
-        <button id="btnListening">🎧 Listen</button>
-        <select id="langBottom"></select>
+      <div class="controls-container">
+        <div class="control-row">
+          <button id="btnListening" type="button">
+            <span class="button-icon">🎧</span>
+            <span>Start Listening</span>
+          </button>
+          <div class="select-wrap">
+            <label for="langBottom">Bottom Language</label>
+            <select id="langBottom"></select>
+          </div>
+        </div>
       </div>
     </div>
 
     <script>
-      const DEEPGRAM_API_KEY = '';
-      const CARTESIA_API_KEY = '';
+      const DEEPGRAM_API_KEY = "";
+      const CARTESIA_API_KEY = "";
 
-      const ECHO_MODEL_ID = 'sonic-3';
-      const ECHO_VOICE_ID = '87286a8d-7ea7-4235-a41a-dd9fa6630feb';
+      const ECHO_MODEL_ID = "sonic-3-latest";
+      const ECHO_VOICE_ID = "87286a8d-7ea7-4235-a41a-dd9fa6630feb";
 
       const rawLanguages = [
-        'Dutch Belgium',
-        'English',
-        'Spanish',
-        'French',
-        'German',
-        'Italian',
-        'Portuguese',
-        'Japanese',
-        'Korean',
-        'Chinese (Simplified)',
-        'Chinese (Traditional)',
-        'Russian',
-        'Arabic',
-        'Hindi',
-        'Filipino',
-        'Indonesian',
-        'Vietnamese',
-        'Thai',
-        'Turkish',
-        'Polish',
-        'Ukrainian',
-        'Greek',
-        'Swedish',
-        'Dutch',
+        "Dutch Belgium", "Abkhaz", "Acehnese", "Acholi", "Afar", "Afrikaans", "Albanian", "Alur", "Amharic",
+        "Arabic", "Armenian", "Assamese", "Avar", "Awadhi", "Aymara", "Azerbaijani", "Balinese", "Baluchi",
+        "Bambara", "Baoule", "Bashkir", "Basque", "Batak Karo", "Batak Simalungun", "Batak Toba", "Belarusian",
+        "Bemba", "Bengali", "Betawi", "Bhojpuri", "Bikol", "Bosnian", "Breton", "Bulgarian", "Buryat",
+        "Cantonese", "Catalan", "Cebuano", "Chamorro", "Chechen", "Chichewa", "Chinese (Simplified)",
+        "Chinese (Traditional)", "Chuukese", "Chuvash", "Corsican", "Crimean Tatar (Cyrillic)",
+        "Crimean Tatar (Latin)", "Croatian", "Czech", "Danish", "Dari", "Dhivehi", "Dinka", "Dogri",
+        "Dombe", "Dutch", "Dyula", "Dzongkha", "English", "Esperanto", "Estonian", "Ewe", "Faroese",
+        "Fijian", "Filipino", "Finnish", "Fon", "French", "French (Canada)", "Frisian", "Friulian", "Fulani",
+        "Ga", "Galician", "Georgian", "German", "Greek", "Guarani", "Gujarati", "Haitian Creole",
+        "Hakha Chin", "Hausa", "Hawaiian", "Hebrew", "Hiligaynon", "Hindi", "Hmong", "Hungarian", "Hunsrik",
+        "Iban", "Icelandic", "Igbo", "Ilocano", "Indonesian", "Inuktut (Latin)", "Inuktut (Syllabics)",
+        "Irish", "Italian", "Jamaican Patois", "Japanese", "Javanese", "Jingpo", "Kalaallisut", "Kannada",
+        "Kanuri", "Kapampangan", "Kazakh", "Khasi", "Khmer", "Kiga", "Kikongo", "Kinyarwanda", "Kituba",
+        "Kokborok", "Komi", "Konkani", "Korean", "Krio", "Kurdish (Kurmanji)", "Kurdish (Sorani)", "Kyrgyz",
+        "Lao", "Latgalian", "Latin", "Latvian", "Ligurian", "Limburgish", "Lingala", "Lithuanian", "Lombard",
+        "Luganda", "Luo", "Luxembourgish", "Macedonian", "Madurese", "Maithili", "Makassar", "Malagasy",
+        "Malay", "Malay (Jawi)", "Malayalam", "Maltese", "Mam", "Manx", "Maori", "Marathi", "Marshallese",
+        "Marwadi", "Mauritian Creole", "Meadow Mari", "Meiteilon (Manipuri)", "Minang", "Mizo", "Mongolian",
+        "Myanmar (Burmese)", "Nahuatl (Eastern Huasteca)", "Ndau", "Ndebele (South)", "Nepalbhasa (Newari)",
+        "Nepali", "NKo", "Norwegian", "Nuer", "Occitan", "Odia (Oriya)", "Oromo", "Ossetian", "Pangasinan",
+        "Papiamento", "Pashto", "Persian", "Polish", "Portuguese (Brazil)", "Portuguese (Portugal)",
+        "Punjabi (Gurmukhi)", "Punjabi (Shahmukhi)", "Quechua", "Q'eqchi'", "Romani", "Romanian", "Rundi",
+        "Russian", "Sami (North)", "Samoan", "Sango", "Sanskrit", "Santali (Latin)", "Santali (Ol Chiki)",
+        "Scots Gaelic", "Sepedi", "Serbian", "Sesotho", "Seychellois Creole", "Shan", "Shona", "Sicilian",
+        "Silesian", "Sindhi", "Sinhala", "Slovak", "Slovenian", "Somali", "Spanish", "Sundanese", "Susu",
+        "Swahili", "Swati", "Swedish", "Tahitian", "Tajik", "Tamazight", "Tamazight (Tifinagh)", "Tamil",
+        "Tatar", "Telugu", "Tetum", "Thai", "Tibetan", "Tigrinya", "Tiv", "Tok Pisin", "Tongan", "Tshiluba",
+        "Tsonga", "Tswana", "Tulu", "Tumbuka", "Turkish", "Turkmen", "Tuvan", "Twi", "Udmurt", "Ukrainian",
+        "Urdu", "Uyghur", "Uzbek", "Venda", "Venetian", "Vietnamese", "Waray", "Welsh", "Wolof", "Xhosa",
+        "Yakut", "Yiddish", "Yoruba", "Yucatec Maya", "Zapotec", "Zulu"
       ];
 
       const codeMap = {
-        English: 'en',
-        Spanish: 'es',
-        French: 'fr',
-        German: 'de',
-        Italian: 'it',
-        Portuguese: 'pt',
-        Dutch: 'nl',
-        'Dutch Belgium': 'nl',
-        Japanese: 'ja',
-        Korean: 'ko',
-        'Chinese (Simplified)': 'zh-CN',
-        'Chinese (Traditional)': 'zh-TW',
-        Russian: 'ru',
-        Arabic: 'ar',
-        Hindi: 'hi',
-        Filipino: 'tl',
-        Indonesian: 'id',
-        Vietnamese: 'vi',
-        Thai: 'th',
-        Turkish: 'tr',
-        Polish: 'pl',
-        Ukrainian: 'uk',
-        Greek: 'el',
-        Swedish: 'sv',
+        "English": "en",
+        "Spanish": "es",
+        "French": "fr",
+        "German": "de",
+        "Italian": "it",
+        "Portuguese (Brazil)": "pt",
+        "Portuguese (Portugal)": "pt",
+        "Dutch": "nl",
+        "Dutch Belgium": "nl",
+        "Japanese": "ja",
+        "Korean": "ko",
+        "Chinese (Simplified)": "zh-CN",
+        "Chinese (Traditional)": "zh-TW",
+        "Russian": "ru",
+        "Arabic": "ar",
+        "Hindi": "hi",
+        "Filipino": "tl",
+        "Indonesian": "id",
+        "Vietnamese": "vi",
+        "Thai": "th",
+        "Turkish": "tr",
+        "Polish": "pl",
+        "Ukrainian": "uk",
+        "Greek": "el",
+        "Swedish": "sv"
       };
 
-      function populateDropdowns() {
-        const topSelect = document.getElementById('langTop');
-        const bottomSelect = document.getElementById('langBottom');
+      const params = new URLSearchParams(window.location.search);
+      const preferredTopLanguage = params.get("sourceLanguage");
+      const preferredBottomLanguage = params.get("targetLanguage");
 
-        rawLanguages.forEach((lang) => {
-          const opt1 = document.createElement('option');
-          const opt2 = document.createElement('option');
-          const safeCode = codeMap[lang] || lang.substring(0, 2).toLowerCase();
-          opt1.value = opt1.textContent = opt2.value = opt2.textContent = lang;
-          opt1.dataset.code = opt2.dataset.code = safeCode;
-          topSelect.appendChild(opt1);
-          bottomSelect.appendChild(opt2);
-        });
-
-        topSelect.value = 'English';
-        bottomSelect.value = 'Spanish';
-      }
-      populateDropdowns();
-
-      let mediaRecorder, orbitSocket, echoSocket, audioContext;
+      let mediaRecorder;
+      let orbitSocket;
+      let echoSocket;
+      let echoReadyPromise = null;
+      let audioContext;
       let nextAudioStartTime = 0;
-      let activeTargetLangCode = 'es';
+      let activeTargetLangCode = "es";
       let activeAudioSources = 0;
-      let currentMode = 'none';
+      let currentMode = "none";
+      let isStopping = false;
 
-      const btnSpeaking = document.getElementById('btnSpeaking');
-      const btnListening = document.getElementById('btnListening');
-      const sttContent = document.getElementById('stt-content');
-      const transContent = document.getElementById('trans-content');
-      const ttsContent = document.getElementById('tts-content');
-      const sttStatus = document.getElementById('stt-status');
-      const ttsStatus = document.getElementById('tts-status');
+      const btnSpeaking = document.getElementById("btnSpeaking");
+      const btnListening = document.getElementById("btnListening");
+      const langTop = document.getElementById("langTop");
+      const langBottom = document.getElementById("langBottom");
+      const sttContent = document.getElementById("stt-content");
+      const transContent = document.getElementById("trans-content");
+      const ttsContent = document.getElementById("tts-content");
+      const sttStatus = document.getElementById("stt-status");
+      const ttsStatus = document.getElementById("tts-status");
+      const modeBadge = document.getElementById("modeBadge");
 
-      function initEcho() {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({
-          sampleRate: 44100,
+      function setCardMessage(element, text, kind = "muted") {
+        const node = document.createElement(kind === "strong" ? "strong" : "span");
+        if (kind === "muted") node.className = "interim-text";
+        if (kind === "error") node.className = "error-text";
+        node.textContent = text;
+        element.replaceChildren(node);
+      }
+
+      function setModeBadge(label, tone = "idle") {
+        modeBadge.textContent = label;
+        modeBadge.dataset.tone = tone;
+      }
+
+      function applyPreferredSelection(select, preferred, fallback) {
+        const normalized = preferred ? preferred.trim().toLowerCase() : "";
+        const match = Array.from(select.options).find((option) => {
+          return (
+            option.value.toLowerCase() === normalized ||
+            (option.textContent || "").trim().toLowerCase() === normalized ||
+            (option.dataset.code || "").toLowerCase() === normalized
+          );
         });
-        nextAudioStartTime = audioContext.currentTime;
 
-        echoSocket = new WebSocket(
-          `wss://api.cartesia.ai/tts/websocket?api_key=${CARTESIA_API_KEY}&cartesia_version=2024-06-10`,
-        );
-        echoSocket.onmessage = (event) => {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'chunk' && msg.data) {
-            ttsStatus.classList.add('speaking');
-            playEchoAudioChunk(msg.data);
-          }
-        };
+        select.value = match ? match.value : fallback;
+      }
+
+      function populateDropdowns() {
+        rawLanguages.forEach((lang) => {
+          const safeCode = codeMap[lang] || lang.substring(0, 2).toLowerCase();
+
+          const topOption = document.createElement("option");
+          topOption.value = lang;
+          topOption.textContent = lang;
+          topOption.dataset.code = safeCode;
+          langTop.appendChild(topOption);
+
+          const bottomOption = document.createElement("option");
+          bottomOption.value = lang;
+          bottomOption.textContent = lang;
+          bottomOption.dataset.code = safeCode;
+          langBottom.appendChild(bottomOption);
+        });
+
+        applyPreferredSelection(langTop, preferredTopLanguage, "English");
+        applyPreferredSelection(langBottom, preferredBottomLanguage, "Spanish");
+      }
+
+      function syncButtons() {
+        const speakingActive = currentMode === "speaking";
+        const listeningActive = currentMode === "listening";
+
+        btnSpeaking.classList.toggle("btn-stop", speakingActive);
+        btnSpeaking.disabled = listeningActive;
+        btnSpeaking.innerHTML = speakingActive
+          ? '<span class="button-icon">🛑</span><span>Stop Speaking</span>'
+          : '<span class="button-icon">🎤</span><span>Start Speaking</span>';
+
+        btnListening.classList.toggle("btn-stop", listeningActive);
+        btnListening.disabled = speakingActive;
+        btnListening.innerHTML = listeningActive
+          ? '<span class="button-icon">🛑</span><span>Stop Listening</span>'
+          : '<span class="button-icon">🎧</span><span>Start Listening</span>';
+      }
+
+      function resetPipelineView() {
+        setCardMessage(sttContent, "Waiting for mic...", "muted");
+        setCardMessage(transContent, "Waiting for input...", "muted");
+        setCardMessage(ttsContent, "Waiting to speak...", "muted");
+        sttStatus.classList.remove("active");
+        ttsStatus.classList.remove("speaking");
+      }
+
+      async function ensureEchoSocket() {
+        if (echoSocket && echoSocket.readyState === WebSocket.OPEN) {
+          return;
+        }
+
+        if (echoReadyPromise) {
+          return echoReadyPromise;
+        }
+
+        echoReadyPromise = new Promise((resolve, reject) => {
+          echoSocket = new WebSocket(
+            "wss://api.cartesia.ai/tts/websocket?api_key=" +
+              CARTESIA_API_KEY +
+              "&cartesia_version=2024-06-10"
+          );
+
+          echoSocket.onopen = () => resolve();
+
+          echoSocket.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type === "chunk" && msg.data) {
+              ttsStatus.classList.add("speaking");
+              playEchoAudioChunk(msg.data);
+            }
+          };
+
+          echoSocket.onerror = () => {
+            echoReadyPromise = null;
+            reject(new Error("Echo connection failed. Check your Cartesia key."));
+          };
+
+          echoSocket.onclose = () => {
+            echoReadyPromise = null;
+            if (activeAudioSources <= 0) {
+              ttsStatus.classList.remove("speaking");
+            }
+          };
+        });
+
+        return echoReadyPromise;
+      }
+
+      async function ensureAudioContext() {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 44100
+          });
+          nextAudioStartTime = audioContext.currentTime;
+        }
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
       }
 
       function playEchoAudioChunk(base64Data) {
+        if (!audioContext) return;
+
         const binaryString = window.atob(base64Data);
         const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+        for (let i = 0; i < binaryString.length; i += 1) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
 
         const float32Data = new Float32Array(bytes.buffer);
         const buffer = audioContext.createBuffer(1, float32Data.length, 44100);
@@ -336,95 +747,132 @@
         source.buffer = buffer;
         source.connect(audioContext.destination);
 
-        activeAudioSources++;
+        activeAudioSources += 1;
         source.onended = () => {
-          activeAudioSources--;
+          activeAudioSources -= 1;
           if (activeAudioSources <= 0) {
             activeAudioSources = 0;
-            ttsStatus.classList.remove('speaking');
+            ttsStatus.classList.remove("speaking");
           }
         };
 
-        if (nextAudioStartTime < audioContext.currentTime)
+        if (nextAudioStartTime < audioContext.currentTime) {
           nextAudioStartTime = audioContext.currentTime + 0.05;
+        }
+
         source.start(nextAudioStartTime);
         nextAudioStartTime += buffer.duration;
       }
 
       async function triggerEcho(text) {
-        if (!echoSocket || echoSocket.readyState !== WebSocket.OPEN) return;
-        ttsContent.innerHTML = `<strong>${text}</strong>`;
+        setCardMessage(ttsContent, text, "strong");
 
-        echoSocket.send(
-          JSON.stringify({
-            context_id: `ctx_${Date.now()}`,
-            model_id: ECHO_MODEL_ID,
-            transcript: text,
-            voice: { mode: 'id', id: ECHO_VOICE_ID },
-            output_format: { container: 'raw', encoding: 'pcm_f32le', sample_rate: 44100 },
-          }),
-        );
+        if (!CARTESIA_API_KEY) {
+          setCardMessage(ttsContent, "Add your Cartesia API key to enable Echo playback.", "error");
+          return;
+        }
+
+        try {
+          await ensureAudioContext();
+          await ensureEchoSocket();
+
+          echoSocket.send(
+            JSON.stringify({
+              context_id: "ctx_" + Date.now(),
+              model_id: ECHO_MODEL_ID,
+              transcript: text,
+              voice: { mode: "id", id: ECHO_VOICE_ID },
+              output_format: {
+                container: "raw",
+                encoding: "pcm_f32le",
+                sample_rate: 44100
+              }
+            })
+          );
+        } catch (error) {
+          setCardMessage(ttsContent, error.message || "Echo playback failed.", "error");
+        }
       }
 
       async function triggerEburon(text) {
-        transContent.innerHTML = `<span class="interim-text">Translating...</span>`;
+        setCardMessage(transContent, "Translating...", "muted");
 
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${activeTargetLangCode}&dt=t&q=${encodeURIComponent(text)}`;
+        const url =
+          "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=" +
+          encodeURIComponent(activeTargetLangCode) +
+          "&dt=t&q=" +
+          encodeURIComponent(text);
 
         try {
           const response = await fetch(url);
           const data = await response.json();
 
-          let translated = '';
+          let translated = "";
           if (data && data[0]) {
             data[0].forEach((segment) => {
               if (segment[0]) translated += segment[0];
             });
           }
 
-          transContent.innerHTML = `<strong>${translated}</strong>`;
+          setCardMessage(transContent, translated || "No translation returned.", translated ? "strong" : "muted");
           return translated;
         } catch (error) {
-          transContent.innerHTML = `<span style="color:red">Error: ${error.message}</span>`;
+          setCardMessage(transContent, "Translation failed. " + (error.message || "Please try again."), "error");
           return null;
         }
       }
 
-      async function startPipeline(sourceDropdownId, targetDropdownId) {
-        const targetOpt = document.getElementById(targetDropdownId).selectedOptions[0];
-        activeTargetLangCode = targetOpt.dataset.code;
+      async function startPipeline(targetDropdownId) {
+        if (!DEEPGRAM_API_KEY) {
+          setCardMessage(sttContent, "Add your Deepgram API key to enable Orbit transcription.", "error");
+          setCardMessage(transContent, "Waiting for input...", "muted");
+          setCardMessage(ttsContent, "Waiting to speak...", "muted");
+          currentMode = "none";
+          syncButtons();
+          setModeBadge("Setup needed", "warn");
+          return;
+        }
 
-        sttContent.innerHTML = `<span class="interim-text">Listening...</span>`;
-        transContent.innerHTML = `<span class="interim-text">Translating to ${targetOpt.value}...</span>`;
-        ttsContent.innerHTML = `<span class="interim-text">Waiting...</span>`;
+        isStopping = false;
 
-        if (!audioContext) initEcho();
-        if (audioContext && audioContext.state === 'suspended') await audioContext.resume();
+        const targetSelect = document.getElementById(targetDropdownId);
+        const targetOption = targetSelect.selectedOptions[0];
+        activeTargetLangCode = targetOption.dataset.code || "en";
+
+        setCardMessage(sttContent, "Requesting microphone access...", "muted");
+        setCardMessage(transContent, "Translating to " + targetOption.value + "...", "muted");
+        setCardMessage(ttsContent, "Waiting to speak...", "muted");
+        setModeBadge(currentMode === "speaking" ? "Speaking live" : "Listening live", "live");
 
         try {
+          await ensureAudioContext();
+
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               echoCancellation: true,
               noiseSuppression: true,
               autoGainControl: true,
-              channelCount: 1,
-            },
+              channelCount: 1
+            }
           });
 
-          mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+          mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
 
           const orbitUrl =
-            'wss://api.deepgram.com/v1/listen?model=nova-3&language=multi&endpointing=10&vad_events=true&interim_results=true&smart_format=true';
+            "wss://api.deepgram.com/v1/listen?model=nova-3&language=multi&endpointing=10&vad_events=true&interim_results=true&smart_format=true";
 
-          orbitSocket = new WebSocket(orbitUrl, ['token', DEEPGRAM_API_KEY]);
+          orbitSocket = new WebSocket(orbitUrl, ["token", DEEPGRAM_API_KEY]);
 
           orbitSocket.onopen = () => {
-            sttStatus.classList.add('active');
-            mediaRecorder.addEventListener('dataavailable', (event) => {
+            sttStatus.classList.add("active");
+            setCardMessage(sttContent, "Listening (auto-detecting language)...", "muted");
+
+            mediaRecorder.addEventListener("dataavailable", (event) => {
               if (event.data.size > 0 && orbitSocket.readyState === WebSocket.OPEN) {
                 orbitSocket.send(event.data);
               }
             });
+
             mediaRecorder.start(250);
           };
 
@@ -433,70 +881,103 @@
 
             if (received.channel && received.channel.alternatives[0]) {
               const transcript = received.channel.alternatives[0].transcript;
+
               if (!received.is_final && transcript.trim().length > 0) {
-                sttContent.innerHTML = `<span class="interim-text">${transcript}</span>`;
+                setCardMessage(sttContent, transcript, "muted");
               } else if (received.is_final && transcript.trim().length > 0) {
-                sttContent.innerHTML = `<strong>${transcript}</strong>`;
+                setCardMessage(sttContent, transcript, "strong");
                 const translated = await triggerEburon(transcript);
-                if (translated) await triggerEcho(translated);
+                if (translated) {
+                  await triggerEcho(translated);
+                }
               }
             }
           };
 
-          orbitSocket.onclose = () => sttStatus.classList.remove('active');
-        } catch (err) {
-          sttContent.innerHTML = `<span style="color:red">Mic error: ${err.message}</span>`;
-          stopPipeline();
+          orbitSocket.onerror = () => {
+            setCardMessage(sttContent, "Orbit connection failed. Check your Deepgram key.", "error");
+            stopPipeline(true);
+          };
+
+          orbitSocket.onclose = () => {
+            sttStatus.classList.remove("active");
+            if (!isStopping && currentMode !== "none") {
+              setCardMessage(sttContent, "Orbit connection closed.", "error");
+              stopPipeline(true);
+            }
+          };
+        } catch (error) {
+          if (error && error.name === "NotAllowedError") {
+            setCardMessage(sttContent, "Microphone permission was denied.", "error");
+          } else if (error && error.name === "NotFoundError") {
+            setCardMessage(sttContent, "No microphone was detected.", "error");
+          } else {
+            setCardMessage(sttContent, "Mic error: " + (error.message || "Unknown error"), "error");
+          }
+
+          stopPipeline(true);
         }
       }
 
-      function stopPipeline() {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      function stopPipeline(preserveMessages = false) {
+        isStopping = true;
+
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
           mediaRecorder.stop();
           mediaRecorder.stream.getTracks().forEach((track) => track.stop());
         }
-        if (orbitSocket) orbitSocket.close();
 
-        currentMode = 'none';
+        if (orbitSocket) {
+          orbitSocket.close();
+          orbitSocket = null;
+        }
 
-        btnSpeaking.classList.remove('btn-stop');
-        btnSpeaking.innerHTML = '🎤 Speak';
-        btnSpeaking.disabled = false;
+        mediaRecorder = null;
+        currentMode = "none";
+        syncButtons();
+        sttStatus.classList.remove("active");
+        setModeBadge("Idle");
 
-        btnListening.classList.remove('btn-stop');
-        btnListening.innerHTML = '🎧 Listen';
-        btnListening.disabled = false;
-
-        sttStatus.classList.remove('active');
-        sttContent.innerHTML = `<span class="interim-text">Microphone off.</span>`;
+        if (!preserveMessages) {
+          resetPipelineView();
+        }
       }
 
-      function toggleSpeaking() {
-        if (currentMode === 'none') {
-          currentMode = 'speaking';
-          btnSpeaking.classList.add('btn-stop');
-          btnSpeaking.innerHTML = '🛑 Stop';
-          btnListening.disabled = true;
-          startPipeline('langTop', 'langBottom');
-        } else if (currentMode === 'speaking') {
+      async function toggleSpeaking() {
+        if (currentMode === "none") {
+          try {
+            await ensureAudioContext();
+          } catch (_) {}
+
+          currentMode = "speaking";
+          syncButtons();
+          startPipeline("langBottom");
+        } else if (currentMode === "speaking") {
           stopPipeline();
         }
       }
 
-      function toggleListening() {
-        if (currentMode === 'none') {
-          currentMode = 'listening';
-          btnListening.classList.add('btn-stop');
-          btnListening.innerHTML = '🛑 Stop';
-          btnSpeaking.disabled = true;
-          startPipeline('langBottom', 'langTop');
-        } else if (currentMode === 'listening') {
+      async function toggleListening() {
+        if (currentMode === "none") {
+          try {
+            await ensureAudioContext();
+          } catch (_) {}
+
+          currentMode = "listening";
+          syncButtons();
+          startPipeline("langTop");
+        } else if (currentMode === "listening") {
           stopPipeline();
         }
       }
 
-      btnSpeaking.addEventListener('click', toggleSpeaking);
-      btnListening.addEventListener('click', toggleListening);
+      populateDropdowns();
+      syncButtons();
+      resetPipelineView();
+      setModeBadge("Idle");
+
+      btnSpeaking.addEventListener("click", toggleSpeaking);
+      btnListening.addEventListener("click", toggleListening);
     </script>
   </body>
 </html>
